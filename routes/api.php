@@ -39,8 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('guru', GuruController::class);
         Route::apiResource('users', UserController::class);
-        Route::apiResource('santri', SantriController::class)
-            ->middleware('role:admin,guru');
     });
 
     //ROLE: ADMIN & BENDAHARA
