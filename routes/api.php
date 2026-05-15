@@ -15,6 +15,7 @@ use App\Http\Controllers\UserController;
 //PUBLIC ROUTES
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout']);
 
 //PROTECTED ROUTES (AUTH)
 Route::middleware('auth:sanctum')->group(function () {
@@ -29,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // NOTIFICATION (SEMUA ROLE)
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
     //ROLE: ADMIN & GURU
     Route::middleware('role:admin,guru')->group(function () {
