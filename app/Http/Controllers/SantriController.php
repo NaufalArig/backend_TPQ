@@ -60,29 +60,33 @@ class SantriController extends Controller
         $santri = Santri::findOrFail($id);
 
         $validated = $request->validate([
-            'nama' => 'required|string|max:255',
+            'nama'          => 'required|string|max:255',
             'jenis_kelamin' => 'required|in:L,P',
             'tanggal_lahir' => 'required|date',
-            'nama_wali' => 'required|string|max:255',
-            'kontak_wali' => 'required|string|max:20',
-            'alamat' => 'nullable|string',
+            'nama_wali'     => 'required|string|max:255',
+            'kontak_wali'   => 'required|string|max:20',
+            'alamat'        => 'nullable|string',
+            'status'        => 'nullable|in:pending,aktif,lulus,keluar',
         ]);
 
         $tanggalLahir = Carbon::parse($validated['tanggal_lahir']);
         $tanggalMasuk = $tanggalLahir->copy()->addYears(3);
 
-        $status = now()->greaterThanOrEqualTo($tanggalMasuk)
-            ? 'aktif'
-            : 'pending';
+        // Hitung status otomatis hanya jika status tidak diisi manual
+        if (empty($validated['status'])) {
+            $validated['status'] = now()->greaterThanOrEqualTo($tanggalMasuk)
+                ? 'aktif'
+                : 'pending';
+        }
 
+        // Jika status diset lulus/keluar, jangan override dengan otomatis
         $validated['tanggal_masuk'] = $tanggalMasuk->format('Y-m-d');
-        $validated['status'] = $status;
 
         $santri->update($validated);
 
         return response()->json([
             'message' => 'Data santri berhasil diperbarui',
-            'data' => $santri,
+            'data'    => $santri,
         ]);
     }
 

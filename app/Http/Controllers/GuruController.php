@@ -22,7 +22,7 @@ class GuruController extends Controller
             'alamat' => 'required|string',
             'tanggal_masuk' => 'required|date',
             'kontak' => 'required|string|max:20',
-            'status' => 'required|in:aktif,keluar',
+            'status' => 'required|in:aktif,nonaktif',
         ]);
 
         if ($validator->fails()) {
@@ -58,7 +58,7 @@ class GuruController extends Controller
             'kontak' => 'required|string|max:20',
             'tanggal_masuk' => 'required|date',
             'tanggal_keluar' => 'nullable|date',
-            'status' => 'required|in:aktif,keluar',
+            'status' => 'required|in:aktif,nonaktif',
         ]);
 
         if ($validator->fails()) {
