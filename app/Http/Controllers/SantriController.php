@@ -25,7 +25,7 @@ class SantriController extends Controller
             'tanggal_lahir' => 'required|date',
             'nama_wali' => 'required|string|max:255',
             'kontak_wali' => 'required|string|max:20',
-            'alamat' => 'nullable|string',
+            'alamat' => 'required|string',
         ]);
 
         $tanggalLahir = Carbon::parse($validated['tanggal_lahir']);

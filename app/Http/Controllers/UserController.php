@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        return response()->json(User::select('id','name','email','role')->get());
+        return response()->json(User::select('id', 'name', 'email', 'role')->get());
     }
 
     public function store(Request $request)
@@ -37,6 +37,13 @@ class UserController extends Controller
         return response()->json($user, 201);
     }
 
+    public function show($id)
+    {
+        $user = User::select('id', 'name', 'email', 'role')->findOrFail($id);
+
+        return response()->json($user);
+    }
+
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -56,7 +63,7 @@ class UserController extends Controller
             $user->password = Hash::make($request->password);
         }
 
-        $user->update($request->only(['name','email','role']));
+        $user->update($request->only(['name', 'email', 'role']));
 
         return response()->json($user);
     }
