@@ -11,6 +11,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AbsensiSantriController;
 
 //PUBLIC ROUTES
 Route::post('/register', [AuthController::class, 'register']);
@@ -35,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
     //ROLE: ADMIN & GURU
     Route::middleware('role:admin,guru')->group(function () {
         Route::apiResource('santri', SantriController::class);
+
+        Route::get('/absensi-santri', [AbsensiSantriController::class, 'index']);
+        Route::post('/absensi-santri', [AbsensiSantriController::class, 'store']);
     });
 
     //ROLE: ADMIN
