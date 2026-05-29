@@ -66,4 +66,20 @@ class AbsensiSantriController extends Controller
             'message' => 'Absensi berhasil disimpan',
         ]);
     }
+
+    public function riwayat(Request $request)
+    {
+        $query = AbsensiSantri::with(['santri:id,nama', 'user:id,name'])
+            ->latest('tanggal');
+
+        if ($request->tanggal) {
+            $query->whereDate('tanggal', $request->tanggal);
+        }
+
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        return response()->json($query->get());
+    }
 }

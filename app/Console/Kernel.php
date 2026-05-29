@@ -10,6 +10,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('check:santri-age')->daily();
+        $schedule->command('guru:update-status')->daily();
     }
 
     protected function commands(): void

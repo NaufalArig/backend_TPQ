@@ -21,6 +21,7 @@ class Santri extends Model
         'tanggal_masuk',
         'status',
         'notifikasi_usia',
+        'foto',
     ];
 
     public function notifications()

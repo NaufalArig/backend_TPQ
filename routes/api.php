@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/absensi-santri', [AbsensiSantriController::class, 'index']);
         Route::post('/absensi-santri', [AbsensiSantriController::class, 'store']);
+        Route::get('/absensi-santri-riwayat', [AbsensiSantriController::class, 'riwayat']);
     });
 
     //ROLE: ADMIN

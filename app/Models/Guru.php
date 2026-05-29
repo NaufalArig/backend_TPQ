@@ -10,11 +10,18 @@ class Guru extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'nama',
         'alamat',
         'kontak',
         'tanggal_masuk',
         'tanggal_keluar',
         'status',
+        'foto',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

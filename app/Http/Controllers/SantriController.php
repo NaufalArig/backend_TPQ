@@ -6,6 +6,7 @@ use App\Models\Santri;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class SantriController extends Controller
 {
@@ -26,7 +27,12 @@ class SantriController extends Controller
             'nama_wali' => 'required|string|max:255',
             'kontak_wali' => 'required|string|max:20',
             'alamat' => 'required|string',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
+
+        if ($request->hasFile('foto')) {
+            $validated['foto'] = $request->file('foto')->store('santri', 'public');
+        }
 
         $tanggalLahir = Carbon::parse($validated['tanggal_lahir']);
         $tanggalMasuk = $tanggalLahir->copy()->addYears(3);
@@ -67,19 +73,30 @@ class SantriController extends Controller
             'kontak_wali'   => 'required|string|max:20',
             'alamat'        => 'nullable|string',
             'status'        => 'nullable|in:pending,aktif,lulus,keluar',
+            'foto'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048', // ← tambahkan ini
         ]);
+
+        // ← Tambahkan blok ini
+        if ($request->hasFile('foto')) {
+            // Hapus foto lama jika ada
+            if ($santri->foto) {
+                Storage::disk('public')->delete($santri->foto);
+            }
+            $validated['foto'] = $request->file('foto')->store('santri', 'public');
+        } else {
+            // Jangan sentuh kolom foto jika tidak ada file baru
+            unset($validated['foto']);
+        }
 
         $tanggalLahir = Carbon::parse($validated['tanggal_lahir']);
         $tanggalMasuk = $tanggalLahir->copy()->addYears(3);
 
-        // Hitung status otomatis hanya jika status tidak diisi manual
         if (empty($validated['status'])) {
             $validated['status'] = now()->greaterThanOrEqualTo($tanggalMasuk)
                 ? 'aktif'
                 : 'pending';
         }
 
-        // Jika status diset lulus/keluar, jangan override dengan otomatis
         $validated['tanggal_masuk'] = $tanggalMasuk->format('Y-m-d');
 
         $santri->update($validated);

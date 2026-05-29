@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('kontak');
             $table->date('tanggal_masuk');
             $table->date('tanggal_keluar')->nullable();
-            $table->enum('status', ['aktif', 'nonaktif'])->default('aktif');
+            $table->enum('status', ['pending', 'aktif', 'nonaktif'])->default('pending');
             $table->timestamps();
         });
     }
