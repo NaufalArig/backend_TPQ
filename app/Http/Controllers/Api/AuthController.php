@@ -46,7 +46,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required',
+            'email' => 'required|email',
             'password' => 'required',
         ]);
 
@@ -58,12 +58,12 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('name', $request->name)->first();
+        $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Username or password is incorrect',
+                'message' => 'Email or password is incorrect',
             ], 401);
         }
 
