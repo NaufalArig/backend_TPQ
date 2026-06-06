@@ -10,76 +10,102 @@ class AbsensiSantriController extends Controller
 {
     public function index(Request $request)
     {
-        $tanggal = $request->query('tanggal', now()->toDateString());
+        $attendanceDate = $request->get('attendance_date', now()->format('Y-m-d'));
 
-        $santri = Santri::where('status', 'aktif')
-            ->orderBy('nama')
-            ->get();
-
-        $absensi = AbsensiSantri::where('tanggal', $tanggal)
+        $students = Santri::with([
+            'studyClass:id,name',
+            'attendances' => function ($query) use ($attendanceDate) {
+                $query->whereDate('attendance_date', $attendanceDate);
+            },
+        ])
+            ->where('status', 'active')
+            ->orderBy('name')
             ->get()
-            ->keyBy('santri_id');
+            ->map(function ($student) {
+                $attendance = $student->attendances->first();
 
-        $data = $santri->map(function ($item) use ($absensi) {
-            $absen = $absensi->get($item->id);
-
-            return [
-                'santri_id' => $item->id,
-                'nama' => $item->nama,
-                'tanggal' => $absen?->tanggal,
-                'status' => $absen?->status ?? 'hadir',
-                'keterangan' => $absen?->keterangan ?? '',
-            ];
-        });
+                return [
+                    'id' => $student->id,
+                    'study_class_id' => $student->study_class_id,
+                    'name' => $student->name,
+                    'nisn' => $student->nisn,
+                    'student_number' => $student->student_number,
+                    'study_class' => $student->studyClass,
+                    'attendance' => $attendance ? [
+                        'id' => $attendance->id,
+                        'student_id' => $attendance->student_id,
+                        'attendance_date' => $attendance->attendance_date->format('Y-m-d'),
+                        'status' => $attendance->status,
+                        'note' => $attendance->note,
+                    ] : null,
+                ];
+            });
 
         return response()->json([
-            'tanggal' => $tanggal,
-            'data' => $data,
+            'attendance_date' => $attendanceDate,
+            'students' => $students,
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tanggal' => 'required|date',
-            'absensi' => 'required|array',
-            'absensi.*.santri_id' => 'required|exists:santris,id',
-            'absensi.*.status' => 'required|in:hadir,izin,sakit,alpa',
-            'absensi.*.keterangan' => 'nullable|string',
+            'attendance_date' => 'required|date',
+            'attendances' => 'required|array|min:1',
+            'attendances.*.student_id' => 'required|exists:students,id',
+            'attendances.*.status' => 'required|in:present,permission,sick,absent',
+            'attendances.*.note' => 'nullable|string',
         ]);
 
-        foreach ($validated['absensi'] as $item) {
+        foreach ($validated['attendances'] as $item) {
             AbsensiSantri::updateOrCreate(
                 [
-                    'santri_id' => $item['santri_id'],
-                    'tanggal' => $validated['tanggal'],
+                    'student_id' => $item['student_id'],
+                    'attendance_date' => $validated['attendance_date'],
                 ],
                 [
                     'user_id' => auth()->id(),
                     'status' => $item['status'],
-                    'keterangan' => $item['keterangan'] ?? null,
+                    'note' => $item['note'] ?? null,
                 ]
             );
         }
 
         return response()->json([
-            'message' => 'Absensi berhasil disimpan',
+            'message' => 'Student attendance saved successfully',
         ]);
     }
 
     public function riwayat(Request $request)
     {
-        $query = AbsensiSantri::with(['santri:id,nama', 'user:id,name'])
-            ->latest('tanggal');
+        $query = AbsensiSantri::with([
+            'student:id,study_class_id,name,nisn,student_number',
+            'student.studyClass:id,name',
+            'user:id,name,username',
+        ]);
 
-        if ($request->tanggal) {
-            $query->whereDate('tanggal', $request->tanggal);
+        if ($request->filled('attendance_date')) {
+            $query->whereDate('attendance_date', $request->attendance_date);
         }
 
-        if ($request->status) {
+        if ($request->filled('date_from')) {
+            $query->whereDate('attendance_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('attendance_date', '<=', $request->date_to);
+        }
+
+        if ($request->filled('student_id')) {
+            $query->where('student_id', $request->student_id);
+        }
+
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        return response()->json($query->get());
+        return response()->json(
+            $query->latest('attendance_date')->get()
+        );
     }
 }

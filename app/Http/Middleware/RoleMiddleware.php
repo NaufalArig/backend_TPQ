@@ -8,11 +8,25 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    public function handle(Request $request, Closure $next, ...$roles)
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (!in_array($request->user()->role, $roles)) {
+        $user = $request->user();
+
+        if (! $user) {
             return response()->json([
-                'message' => 'Akses ditolak'
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => 'Akun tidak aktif.',
+            ], 403);
+        }
+
+        if (! in_array($user->role, $roles)) {
+            return response()->json([
+                'message' => 'Unauthorized.',
             ], 403);
         }
 

@@ -3,119 +3,212 @@
 namespace App\Http\Controllers;
 
 use App\Models\Guru;
-use Illuminate\Http\Request;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Services\ActivityLogService;
 
 class GuruController extends Controller
 {
     public function index()
     {
-        return response()->json(Guru::latest()->get());
+        return response()->json(
+            Guru::with('user:id,name,username,email,role,status')
+                ->latest()
+                ->get()
+        );
     }
-
-    public function create() {}
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'alamat' => 'required|string',
-            'tanggal_masuk' => 'required|date',
-            'kontak' => 'required|string|max:20',
-            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            // login account
+            'username' => 'required|string|max:255|unique:users,username',
+            'email' => 'nullable|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6',
+
+            // teacher data
+            'teacher_number' => 'nullable|string|max:255',
+            'tpq_number' => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'gender' => 'nullable|in:male,female',
+            'birth_place' => 'nullable|string|max:255',
+            'birth_date' => 'nullable|date',
+            'address' => 'nullable|string',
+            'village' => 'nullable|string|max:255',
+            'district' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'province' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'certificate_from' => 'nullable|string|max:255',
+            'certificate_number' => 'nullable|string|max:255',
+            'education' => 'nullable|string|max:255',
+            'join_date' => 'required|date',
+            'photo' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        if ($request->hasFile('foto')) {
-            $validated['foto'] = $request->file('foto')->store('guru', 'public');
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo')
+                ->store('teachers/photos', 'public');
         }
 
-        $tanggalMasuk = \Carbon\Carbon::parse($validated['tanggal_masuk']);
-
-        $validated['status'] = $tanggalMasuk->isFuture()
+        $validated['status'] = Carbon::parse($validated['join_date'])->isFuture()
             ? 'pending'
-            : 'aktif';
+            : 'active';
 
-        $guru = DB::transaction(function () use ($validated) {
-
+        $teacher = DB::transaction(function () use ($validated) {
             $user = User::create([
-                'name' => $validated['nama'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'role' => 'guru',
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'] ?? null,
+                'password' => $validated['password'],
+                'role' => 'teacher',
+                'status' => 'active',
             ]);
 
-            unset($validated['email'], $validated['password']);
+            unset($validated['username'], $validated['email'], $validated['password']);
 
             return Guru::create([
                 ...$validated,
                 'user_id' => $user->id,
-                'notifikasi_usia' => false,
+                'age_notification_sent' => false,
             ]);
         });
 
+        ActivityLogService::log(
+            action: 'create',
+            module: 'teachers',
+            entity: $teacher,
+            oldValues: null,
+            newValues: $teacher->toArray(),
+            description: 'Created teacher: ' . $teacher->name
+        );
+
         return response()->json([
-            'message' => 'Data guru berhasil ditambahkan',
-            'data' => $guru,
+            'message' => 'Teacher created successfully',
+            'data' => $teacher->load('user:id,name,username,email,role,status'),
         ], 201);
     }
 
     public function show(string $id)
     {
-        $guru = Guru::findOrFail($id);
+        $teacher = Guru::with('user:id,name,username,email,role,status')
+            ->findOrFail($id);
 
-        return response()->json($guru);
+        return response()->json($teacher);
     }
 
-    public function edit(Guru $guru) {}
-
-    public function update(Request $request, Guru $guru)
+    public function update(Request $request, string $id)
     {
+        $teacher = Guru::findOrFail($id);
+        $oldValues = $teacher->toArray();
+
+
         $validated = $request->validate([
-            'nama' => 'required|string|max:255',
-            'alamat' => 'required|string',
-            'kontak' => 'required|string|max:20',
-            'tanggal_masuk' => 'required|date',
-            'tanggal_keluar' => 'nullable|date',
-            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'teacher_number' => 'nullable|string|max:255',
+            'tpq_number' => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'gender' => 'nullable|in:male,female',
+            'birth_place' => 'nullable|string|max:255',
+            'birth_date' => 'nullable|date',
+            'address' => 'nullable|string',
+            'village' => 'nullable|string|max:255',
+            'district' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'province' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'certificate_from' => 'nullable|string|max:255',
+            'certificate_number' => 'nullable|string|max:255',
+            'education' => 'nullable|string|max:255',
+            'join_date' => 'required|date',
+            'leave_date' => 'nullable|date',
+            'photo' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        if ($request->hasFile('foto')) {
-            $validated['foto'] = $request->file('foto')->store('guru', 'public');
+        if ($request->hasFile('photo')) {
+            if ($teacher->photo) {
+                Storage::disk('public')->delete($teacher->photo);
+            }
+
+            $validated['photo'] = $request->file('photo')
+                ->store('teachers/photos', 'public');
+        } else {
+            unset($validated['photo']);
         }
 
-        $tanggalMasuk = \Carbon\Carbon::parse($validated['tanggal_masuk']);
-        $tanggalKeluar = !empty($validated['tanggal_keluar'])
-            ? \Carbon\Carbon::parse($validated['tanggal_keluar'])
+        $joinDate = Carbon::parse($validated['join_date']);
+        $leaveDate = !empty($validated['leave_date'])
+            ? Carbon::parse($validated['leave_date'])
             : null;
 
-        if ($tanggalKeluar && $tanggalKeluar->lte(now())) {
-            $validated['status'] = 'nonaktif';
-        } elseif ($tanggalMasuk->isFuture()) {
+        if ($leaveDate && $leaveDate->lte(now())) {
+            $validated['status'] = 'inactive';
+        } elseif ($joinDate->isFuture()) {
             $validated['status'] = 'pending';
         } else {
-            $validated['status'] = 'aktif';
+            $validated['status'] = 'active';
         }
 
-        $guru->update($validated);
+        DB::transaction(function () use ($teacher, $validated) {
+            $teacher->update($validated);
+
+            if ($teacher->user) {
+                $teacher->user->update([
+                    'name' => $validated['name'],
+                    'status' => $validated['status'] === 'inactive' ? 'inactive' : 'active',
+                ]);
+            }
+        });
+
+        ActivityLogService::log(
+            action: 'update',
+            module: 'teachers',
+            entity: $teacher,
+            oldValues: $oldValues,
+            newValues: $teacher->fresh()->toArray(),
+            description: 'Updated teacher: ' . $teacher->name
+        );
 
         return response()->json([
-            'message' => 'Data guru berhasil diperbarui',
-            'data' => $guru,
+            'message' => 'Teacher updated successfully',
+            'data' => $teacher->fresh('user:id,name,username,email,role,status'),
         ]);
     }
-
 
     public function destroy(string $id)
     {
-        $guru = Guru::findOrFail($id);
-        $guru->delete();
+        $teacher = Guru::with('user')->findOrFail($id);
+
+        $oldValues = $teacher->toArray();
+        $teacherName = $teacher->name;
+
+        DB::transaction(function () use ($teacher) {
+            if ($teacher->photo) {
+                Storage::disk('public')->delete($teacher->photo);
+            }
+
+            $user = $teacher->user;
+
+            $teacher->delete();
+
+            if ($user && $user->role === 'teacher') {
+                $user->delete();
+            }
+        });
+
+        ActivityLogService::log(
+            action: 'delete',
+            module: 'teachers',
+            entity: null,
+            oldValues: $oldValues,
+            newValues: null,
+            description: 'Deleted teacher: ' . $teacherName
+        );
 
         return response()->json([
-            'message' => 'Data guru berhasil dihapus',
+            'message' => 'Teacher deleted successfully',
         ]);
     }
 }

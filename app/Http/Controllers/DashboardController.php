@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Santri;
 use App\Models\Guru;
 use App\Models\User;
-use App\Models\Keuangan;
+use App\Models\Kelas;
+use App\Models\KeuanganSpp;
+use App\Models\KeuanganPembangunan;
 use App\Models\Notification;
 use Carbon\Carbon;
 
@@ -13,52 +15,136 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $bulanIni = Carbon::now()->month;
-        $tahunIni = Carbon::now()->year;
+        $now = Carbon::now();
 
-        $keuanganBulanIni = Keuangan::whereMonth('tanggal', $bulanIni)
-            ->whereYear('tanggal', $tahunIni)
-            ->get();
+        $tuitionThisMonth = KeuanganSpp::whereMonth('payment_date', $now->month)
+            ->whereYear('payment_date', $now->year)
+            ->sum('amount');
 
-        $pemasukan   = $keuanganBulanIni->where('jenis', 'pemasukan')->sum('nominal');
-        $pengeluaran = $keuanganBulanIni->where('jenis', 'pengeluaran')->sum('nominal');
+        $developmentFundThisMonth = KeuanganPembangunan::whereMonth('payment_date', $now->month)
+            ->whereYear('payment_date', $now->year)
+            ->sum('amount');
 
-        $chartKeuangan = [];
+        $incomeThisMonth = $tuitionThisMonth + $developmentFundThisMonth;
+
+        $totalTuition = KeuanganSpp::sum('amount');
+        $totalDevelopmentFund = KeuanganPembangunan::sum('amount');
+        $totalIncome = $totalTuition + $totalDevelopmentFund;
+
+        $financeChart = [];
+
         for ($i = 5; $i >= 0; $i--) {
-            $bulan = Carbon::now()->subMonths($i);
-            $pemasukann = Keuangan::where('jenis', 'pemasukan')
-                ->whereMonth('tanggal', $bulan->month)
-                ->whereYear('tanggal', $bulan->year)
-                ->sum('nominal');
-            $pengeluarann = Keuangan::where('jenis', 'pengeluaran')
-                ->whereMonth('tanggal', $bulan->month)
-                ->whereYear('tanggal', $bulan->year)
-                ->sum('nominal');
+            $date = Carbon::now()->subMonths($i);
 
-            $chartKeuangan[] = [
-                'bulan'       => $bulan->translatedFormat('M Y'),
-                'pemasukan'   => (float) $pemasukann,
-                'pengeluaran' => (float) $pengeluarann,
+            $tuition = KeuanganSpp::whereMonth('payment_date', $date->month)
+                ->whereYear('payment_date', $date->year)
+                ->sum('amount');
+
+            $developmentFund = KeuanganPembangunan::whereMonth('payment_date', $date->month)
+                ->whereYear('payment_date', $date->year)
+                ->sum('amount');
+
+            $financeChart[] = [
+                'month_label' => $date->translatedFormat('M Y'),
+                'tuition' => (float) $tuition,
+                'development_fund' => (float) $developmentFund,
+                'total_income' => (float) ($tuition + $developmentFund),
             ];
         }
 
+        $latestTuitionPayments = KeuanganSpp::with([
+            'student:id,name,nisn',
+            'user:id,name,username',
+        ])
+            ->latest('payment_date')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'type' => 'tuition',
+                    'payment_date' => optional($item->payment_date)->format('Y-m-d'),
+                    'amount' => (float) $item->amount,
+                    'note' => $item->note,
+                    'student' => $item->student,
+                    'financial_category' => null,
+                    'user' => $item->user,
+                    'created_at' => $item->created_at,
+                ];
+            });
+
+        $latestDevelopmentFundPayments = KeuanganPembangunan::with([
+            'financialCategory:id,name',
+            'user:id,name,username',
+        ])
+            ->latest('payment_date')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'type' => 'development_fund',
+                    'payment_date' => optional($item->payment_date)->format('Y-m-d'),
+                    'amount' => (float) $item->amount,
+                    'note' => $item->note,
+                    'student' => null,
+                    'financial_category' => $item->financialCategory,
+                    'user' => $item->user,
+                    'created_at' => $item->created_at,
+                ];
+            });
+
+        $latestTransactions = $latestTuitionPayments
+            ->merge($latestDevelopmentFundPayments)
+            ->sortByDesc(function ($item) {
+                return $item['payment_date'] . ' ' . $item['created_at'];
+            })
+            ->values()
+            ->take(5);
+
         return response()->json([
-            'total_santri'           => Santri::count(),
-            'total_guru'             => Guru::count(),
-            'total_user'             => User::count(),
-            'pemasukan'              => $pemasukan,
-            'pengeluaran'            => $pengeluaran,
-            'saldo'                  => $pemasukan - $pengeluaran,
-            'chart_keuangan'         => $chartKeuangan,
-            'notifikasi_belum_dibaca' => Notification::where('dibaca', false)->count(),
-            'santri_pending'         => Santri::where('status', 'pending')
+            'total_students' => Santri::count(),
+            'active_students' => Santri::where('status', 'active')->count(),
+            'pending_students' => Santri::where('status', 'pending')->count(),
+            'graduated_students' => Santri::where('status', 'graduated')->count(),
+            'left_students' => Santri::where('status', 'left')->count(),
+
+            'total_teachers' => Guru::count(),
+            'active_teachers' => Guru::where('status', 'active')->count(),
+            'pending_teachers' => Guru::where('status', 'pending')->count(),
+            'inactive_teachers' => Guru::where('status', 'inactive')->count(),
+
+            'total_users' => User::count(),
+
+            'total_study_classes' => Kelas::count(),
+            'active_study_classes' => Kelas::where('status', 'active')->count(),
+
+            'tuition_this_month' => (float) $tuitionThisMonth,
+            'development_fund_this_month' => (float) $developmentFundThisMonth,
+            'income_this_month' => (float) $incomeThisMonth,
+
+            'total_tuition' => (float) $totalTuition,
+            'total_development_fund' => (float) $totalDevelopmentFund,
+            'total_income' => (float) $totalIncome,
+
+            'unread_notifications' => Notification::where('is_read', false)->count(),
+
+            'pending_students_list' => Santri::with('studyClass:id,name')
+                ->where('status', 'pending')
                 ->latest()
                 ->take(5)
-                ->get(['id', 'nama', 'tanggal_lahir', 'tanggal_masuk']),
-            'transaksi_terakhir'     => Keuangan::with('user:id,name')
-                ->latest()
-                ->take(5)
-                ->get(),
+                ->get([
+                    'id',
+                    'study_class_id',
+                    'name',
+                    'birth_date',
+                    'join_date',
+                    'status',
+                ]),
+
+            'latest_transactions' => $latestTransactions,
+
+            'finance_chart' => $financeChart,
         ]);
     }
 }

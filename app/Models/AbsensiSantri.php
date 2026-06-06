@@ -2,24 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AbsensiSantri extends Model
 {
-    use HasFactory;
+    protected $table = 'student_attendances';
 
     protected $fillable = [
-        'santri_id',
+        'student_id',
         'user_id',
-        'tanggal',
+        'attendance_date',
         'status',
-        'keterangan',
+        'note',
     ];
 
-    public function santri()
+    protected $casts = [
+        'attendance_date' => 'date',
+    ];
+
+    public function student()
     {
-        return $this->belongsTo(Santri::class);
+        return $this->belongsTo(Santri::class, 'student_id');
     }
 
     public function user()

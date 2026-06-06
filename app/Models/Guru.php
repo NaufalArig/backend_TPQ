@@ -2,22 +2,41 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Guru extends Model
 {
-    use HasFactory;
+    protected $table = 'teachers';
 
     protected $fillable = [
         'user_id',
-        'nama',
-        'alamat',
-        'kontak',
-        'tanggal_masuk',
-        'tanggal_keluar',
+        'teacher_number',
+        'tpq_number',
+        'name',
+        'gender',
+        'birth_place',
+        'birth_date',
+        'address',
+        'village',
+        'district',
+        'city',
+        'province',
+        'phone',
+        'certificate_from',
+        'certificate_number',
+        'education',
+        'join_date',
+        'leave_date',
         'status',
-        'foto',
+        'photo',
+        'age_notification_sent',
+    ];
+
+    protected $casts = [
+        'birth_date' => 'date',
+        'join_date' => 'date',
+        'leave_date' => 'date',
+        'age_notification_sent' => 'boolean',
     ];
 
     public function user()

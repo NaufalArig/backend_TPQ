@@ -4,21 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Notification extends Model
+class KeuanganSpp extends Model
 {
-    protected $table = 'notifications';
+    protected $table = 'tuition_payments';
 
     protected $fillable = [
-        'title',
-        'message',
-        'type',
-        'is_read',
-        'user_id',
         'student_id',
+        'user_id',
+        'payment_date',
+        'month',
+        'year',
+        'amount',
+        'note',
     ];
 
     protected $casts = [
-        'is_read' => 'boolean',
+        'payment_date' => 'date',
+        'month' => 'integer',
+        'year' => 'integer',
+        'amount' => 'decimal:2',
     ];
 
     public function student()

@@ -3,57 +3,44 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
-use App\Models\Santri;
-use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
     public function index()
     {
-        $santriPending = Santri::where('status', 'pending')
-            ->where('notifikasi_usia', false)
-            ->get();
-
-        foreach ($santriPending as $santri) {
-            $umur = Carbon::parse($santri->tanggal_lahir)->age;
-
-            if ($umur >= 3) {
-                Notification::firstOrCreate(
-                    ['santri_id' => $santri->id],
-                    [
-                        'judul' => 'Santri Siap Aktif',
-                        'pesan' => "{$santri->nama} sudah berusia {$umur} tahun dan siap diaktifkan.",
-                        'dibaca' => false,
-                    ]
-                );
-
-                $santri->update(['notifikasi_usia' => true]);
-            }
-        }
-
-        $notifications = Notification::with('santri:id,nama')
-            ->orderBy('dibaca', 'asc')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json([
-            'data'   => $notifications,
-            'unread' => $notifications->where('dibaca', false)->count(),
-        ]);
+        return response()->json(
+            Notification::with([
+                'student:id,name,birth_date,join_date,status',
+                'user:id,name,username',
+            ])
+                ->latest()
+                ->get()
+        );
     }
 
-    public function markAsRead($id)
+    public function markAsRead(string $id)
     {
         $notification = Notification::findOrFail($id);
-        $notification->update(['dibaca' => true]);
 
-        return response()->json(['message' => 'Notifikasi ditandai sebagai dibaca.']);
+        $notification->update([
+            'is_read' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Notification marked as read',
+            'data' => $notification,
+        ]);
     }
 
     public function markAllAsRead()
     {
-        Notification::where('dibaca', false)->update(['dibaca' => true]);
+        Notification::where('is_read', false)->update([
+            'is_read' => true,
+        ]);
 
-        return response()->json(['message' => 'Semua notifikasi telah dibaca.']);
+        return response()->json([
+            'message' => 'All notifications marked as read',
+        ]);
     }
 }
