@@ -2,23 +2,71 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\AbsensiSantri;
+use App\Models\Guru;
+use App\Models\Kelas;
 use App\Models\Santri;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AbsensiSantriController extends Controller
 {
+    use UsesTpqScope;
+
     public function index(Request $request)
     {
         $attendanceDate = $request->get('attendance_date', now()->format('Y-m-d'));
+        $studyClassId = $request->get('study_class_id');
+        $user = auth()->user();
 
-        $students = Santri::with([
+        $query = Santri::with([
             'studyClass:id,name',
             'attendances' => function ($query) use ($attendanceDate) {
-                $query->whereDate('attendance_date', $attendanceDate);
+                $query->whereDate('attendance_date', $attendanceDate)
+                    ->where('tpq_id', $this->currentTpqId());
             },
         ])
-            ->where('status', 'active')
+            ->where('tpq_id', $this->currentTpqId())
+            ->where('status', 'active');
+
+        if ($studyClassId) {
+            $kelas = Kelas::where('id', $studyClassId)
+                ->where('tpq_id', $this->currentTpqId())
+                ->first();
+
+            if (!$kelas) {
+                abort(422, 'Kelas tidak ditemukan pada TPQ ini.');
+            }
+
+            if ($user->role === 'teacher') {
+                $classIds = $this->getTeacherClassIds();
+
+                if (!$classIds->contains((int) $studyClassId)) {
+                    abort(403, 'Anda tidak memiliki akses ke kelas ini.');
+                }
+            }
+
+            $query->where('study_class_id', $studyClassId);
+        }
+
+        if ($user->role === 'teacher') {
+            $classIds = $this->getTeacherClassIds();
+
+            if ($classIds->isEmpty()) {
+                return response()->json([
+                    'attendance_date' => $attendanceDate,
+                    'study_class_id' => $studyClassId,
+                    'students' => [],
+                ]);
+            }
+
+            if (!$studyClassId) {
+                $query->whereIn('study_class_id', $classIds);
+            }
+        }
+
+        $students = $query
             ->orderBy('name')
             ->get()
             ->map(function ($student) {
@@ -34,7 +82,7 @@ class AbsensiSantriController extends Controller
                     'attendance' => $attendance ? [
                         'id' => $attendance->id,
                         'student_id' => $attendance->student_id,
-                        'attendance_date' => $attendance->attendance_date->format('Y-m-d'),
+                        'attendance_date' => Carbon::parse($attendance->attendance_date)->format('Y-m-d'),
                         'status' => $attendance->status,
                         'note' => $attendance->note,
                     ] : null,
@@ -43,6 +91,7 @@ class AbsensiSantriController extends Controller
 
         return response()->json([
             'attendance_date' => $attendanceDate,
+            'study_class_id' => $studyClassId,
             'students' => $students,
         ]);
     }
@@ -58,8 +107,11 @@ class AbsensiSantriController extends Controller
         ]);
 
         foreach ($validated['attendances'] as $item) {
+            $this->ensureStudentCanBeAccessed($item['student_id']);
+
             AbsensiSantri::updateOrCreate(
                 [
+                    'tpq_id' => $this->currentTpqId(),
                     'student_id' => $item['student_id'],
                     'attendance_date' => $validated['attendance_date'],
                 ],
@@ -78,11 +130,27 @@ class AbsensiSantriController extends Controller
 
     public function riwayat(Request $request)
     {
+        $user = auth()->user();
+
         $query = AbsensiSantri::with([
-            'student:id,study_class_id,name,nisn,student_number',
+            'student:id,tpq_id,study_class_id,name,nisn,student_number',
             'student.studyClass:id,name',
-            'user:id,name,username',
-        ]);
+            'user:id,tpq_id,name,username',
+        ])
+            ->where('tpq_id', $this->currentTpqId());
+
+        if ($user->role === 'teacher') {
+            $classIds = $this->getTeacherClassIds();
+
+            if ($classIds->isEmpty()) {
+                return response()->json([]);
+            }
+
+            $query->whereHas('student', function ($q) use ($classIds) {
+                $q->where('tpq_id', $this->currentTpqId())
+                    ->whereIn('study_class_id', $classIds);
+            });
+        }
 
         if ($request->filled('attendance_date')) {
             $query->whereDate('attendance_date', $request->attendance_date);
@@ -97,6 +165,7 @@ class AbsensiSantriController extends Controller
         }
 
         if ($request->filled('student_id')) {
+            $this->ensureStudentCanBeAccessed($request->student_id);
             $query->where('student_id', $request->student_id);
         }
 
@@ -107,5 +176,41 @@ class AbsensiSantriController extends Controller
         return response()->json(
             $query->latest('attendance_date')->get()
         );
+    }
+
+    private function getTeacherClassIds()
+    {
+        $teacher = Guru::where('user_id', auth()->id())
+            ->where('tpq_id', $this->currentTpqId())
+            ->first();
+
+        if (!$teacher) {
+            return collect();
+        }
+
+        return Kelas::where('teacher_id', $teacher->id)
+            ->where('tpq_id', $this->currentTpqId())
+            ->pluck('id');
+    }
+
+    private function ensureStudentCanBeAccessed($studentId): void
+    {
+        $user = auth()->user();
+
+        $student = Santri::where('id', $studentId)
+            ->where('tpq_id', $this->currentTpqId())
+            ->first();
+
+        if (!$student) {
+            abort(422, 'Santri tidak ditemukan pada TPQ ini.');
+        }
+
+        if ($user->role === 'teacher') {
+            $classIds = $this->getTeacherClassIds();
+
+            if (!$student->study_class_id || !$classIds->contains($student->study_class_id)) {
+                abort(403, 'Anda tidak memiliki akses ke santri ini.');
+            }
+        }
     }
 }

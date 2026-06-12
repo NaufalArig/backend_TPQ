@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
+use App\Models\Guru;
+use App\Models\Kelas;
 use App\Models\Santri;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -11,12 +14,33 @@ use App\Services\ActivityLogService;
 
 class SantriController extends Controller
 {
+    use UsesTpqScope;
+
     public function index()
     {
+        $user = auth()->user();
+
+        $query = Santri::with('studyClass')
+            ->where('tpq_id', $this->currentTpqId());
+
+        if ($user->role === 'teacher') {
+            $teacher = Guru::where('user_id', $user->id)
+                ->where('tpq_id', $this->currentTpqId())
+                ->first();
+
+            if (!$teacher) {
+                return response()->json([]);
+            }
+
+            $classIds = Kelas::where('teacher_id', $teacher->id)
+                ->where('tpq_id', $this->currentTpqId())
+                ->pluck('id');
+
+            $query->whereIn('study_class_id', $classIds);
+        }
+
         return response()->json(
-            Santri::with('studyClass')
-                ->latest()
-                ->get()
+            $query->latest()->get()
         );
     }
 
@@ -50,7 +74,7 @@ class SantriController extends Controller
 
             'father_name' => 'nullable|string|max:255',
             'mother_name' => 'nullable|string|max:255',
-            'guardian_phone' => 'nullable|string|max:20',
+            'contact_guardian' => 'nullable|string|max:20',
 
             'hamlet' => 'nullable|string|max:255',
             'village' => 'nullable|string|max:255',
@@ -71,11 +95,15 @@ class SantriController extends Controller
             'birth_certificate_file' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
         ]);
 
+        $this->ensureClassBelongsToCurrentTpq($validated['study_class_id'] ?? null);
+        $this->ensureTeacherCanAccessClass($validated['study_class_id'] ?? null);
+
         $statusData = $this->calculateJoinDateAndStatus(
             $validated['birth_date'],
             $validated['status'] ?? null
         );
 
+        $validated['tpq_id'] = $this->currentTpqId();
         $validated['join_date'] = $statusData['join_date'];
         $validated['status'] = $statusData['status'];
 
@@ -113,14 +141,16 @@ class SantriController extends Controller
 
     public function show(string $id)
     {
-        $student = Santri::with('studyClass')->findOrFail($id);
+        $student = $this->findStudentByTpqAndRole($id);
 
-        return response()->json($student);
+        return response()->json(
+            $student->load('studyClass')
+        );
     }
 
     public function update(Request $request, string $id)
     {
-        $student = Santri::findOrFail($id);
+        $student = $this->findStudentByTpqAndRole($id);
         $oldValues = $student->toArray();
 
         $validated = $request->validate([
@@ -151,7 +181,7 @@ class SantriController extends Controller
 
             'father_name' => 'nullable|string|max:255',
             'mother_name' => 'nullable|string|max:255',
-            'guardian_phone' => 'nullable|string|max:20',
+            'contact_guardian' => 'nullable|string|max:20',
 
             'hamlet' => 'nullable|string|max:255',
             'village' => 'nullable|string|max:255',
@@ -172,10 +202,15 @@ class SantriController extends Controller
             'birth_certificate_file' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
         ]);
 
+        $this->ensureClassBelongsToCurrentTpq($validated['study_class_id'] ?? null);
+        $this->ensureTeacherCanAccessClass($validated['study_class_id'] ?? null);
+
         $statusData = $this->calculateJoinDateAndStatus(
             $validated['birth_date'],
             $validated['status'] ?? $student->status
         );
+
+        unset($validated['tpq_id']);
 
         $validated['join_date'] = $statusData['join_date'];
         $validated['status'] = $statusData['status'];
@@ -232,7 +267,7 @@ class SantriController extends Controller
 
     public function destroy(string $id)
     {
-        $student = Santri::findOrFail($id);
+        $student = $this->findStudentByTpqAndRole($id);
 
         $oldValues = $student->toArray();
         $studentName = $student->name;
@@ -263,6 +298,72 @@ class SantriController extends Controller
         return response()->json([
             'message' => 'Student deleted successfully',
         ]);
+    }
+
+    private function findStudentByTpqAndRole(string $id): Santri
+    {
+        $user = auth()->user();
+
+        $query = Santri::where('tpq_id', $this->currentTpqId());
+
+        if ($user->role === 'teacher') {
+            $teacher = Guru::where('user_id', $user->id)
+                ->where('tpq_id', $this->currentTpqId())
+                ->first();
+
+            if (!$teacher) {
+                abort(403, 'Akun guru belum terhubung dengan data guru.');
+            }
+
+            $classIds = Kelas::where('teacher_id', $teacher->id)
+                ->where('tpq_id', $this->currentTpqId())
+                ->pluck('id');
+
+            $query->whereIn('study_class_id', $classIds);
+        }
+
+        return $query->findOrFail($id);
+    }
+
+    private function ensureClassBelongsToCurrentTpq($studyClassId): void
+    {
+        if (!$studyClassId) {
+            return;
+        }
+
+        $exists = Kelas::where('id', $studyClassId)
+            ->where('tpq_id', $this->currentTpqId())
+            ->exists();
+
+        if (!$exists) {
+            abort(422, 'Kelas tidak ditemukan pada TPQ ini.');
+        }
+    }
+
+    private function ensureTeacherCanAccessClass($studyClassId): void
+    {
+        $user = auth()->user();
+
+        if ($user->role !== 'teacher' || !$studyClassId) {
+            return;
+        }
+
+        $teacher = Guru::where('user_id', $user->id)
+            ->where('tpq_id', $this->currentTpqId())
+            ->first();
+
+        if (!$teacher) {
+            abort(403, 'Akun guru belum terhubung dengan data guru.');
+        }
+
+        $allowed = Kelas::where('id', $studyClassId)
+            ->where('tpq_id', $this->currentTpqId())
+            ->where('teacher_id', $teacher->id)
+            ->exists();
+
+        if (!$allowed) {
+            abort(403, 'Anda tidak memiliki akses ke kelas ini.');
+        }
     }
 
     private function calculateJoinDateAndStatus(string $birthDate, ?string $currentStatus = null): array

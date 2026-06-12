@@ -12,11 +12,13 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name',
+        'tpq_id',
         'username',
         'email',
         'password',
         'role',
         'status',
+        'photo',
     ];
 
     protected $hidden = [
@@ -37,5 +39,20 @@ class User extends Authenticatable
     public function activityLogs()
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function tpq()
+    {
+        return $this->belongsTo(Tpq::class);
+    }
+
+    public function teacher()
+    {
+        return $this->hasOne(Guru::class);
+    }
+
+    public function assets()
+    {
+        return $this->hasMany(Asset::class);
     }
 }

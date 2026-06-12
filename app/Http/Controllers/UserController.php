@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    use UsesTpqScope;
+
     public function index()
     {
         return response()->json(
-            User::select('id', 'name', 'username', 'email', 'role', 'status', 'created_at', 'updated_at')
+            User::select('id', 'tpq_id', 'name', 'username', 'email', 'role', 'status', 'created_at', 'updated_at')
+                ->where('tpq_id', $this->currentTpqId())
                 ->latest()
                 ->get()
         );
@@ -26,7 +31,7 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users,username',
             'email' => 'nullable|email|max:255|unique:users,email',
             'password' => 'required|string|min:6',
-            'role' => 'required|in:admin,teacher,treasurer',
+            'role' => 'required|in:admin,treasurer',
             'status' => 'required|in:active,inactive',
         ]);
 
@@ -38,10 +43,11 @@ class UserController extends Controller
         }
 
         $user = User::create([
+            'tpq_id' => $this->currentTpqId(),
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
-            'password' => $request->password,
+            'password' => Hash::make($request->password),
             'role' => $request->role,
             'status' => $request->status,
         ]);
@@ -63,7 +69,8 @@ class UserController extends Controller
 
     public function show($id)
     {
-        $user = User::select('id', 'name', 'username', 'email', 'role', 'status', 'created_at', 'updated_at')
+        $user = User::select('id', 'tpq_id', 'name', 'username', 'email', 'role', 'status', 'created_at', 'updated_at')
+            ->where('tpq_id', $this->currentTpqId())
             ->findOrFail($id);
 
         return response()->json($user);
@@ -71,7 +78,9 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        $user = User::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
+
         $oldValues = $user->toArray();
 
         $validator = Validator::make($request->all(), [
@@ -104,6 +113,7 @@ class UserController extends Controller
         }
 
         $data = [
+            'tpq_id' => $this->currentTpqId(),
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
@@ -112,7 +122,7 @@ class UserController extends Controller
         ];
 
         if ($request->filled('password')) {
-            $data['password'] = $request->password;
+            $data['password'] = Hash::make($request->password);
         }
 
         $user->update($data);
@@ -128,17 +138,24 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User updated successfully',
-            'data' => $user,
+            'data' => $user->fresh(),
         ]);
     }
 
     public function destroy($id)
     {
-        $user = User::findOrFail($id);
+        $user = User::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         if (auth()->id() == $user->id) {
             return response()->json([
                 'message' => 'Cannot delete your own account',
+            ], 400);
+        }
+
+        if ($user->role === 'teacher') {
+            return response()->json([
+                'message' => 'Akun guru tidak bisa dihapus dari menu User. Hapus data guru melalui menu Guru.',
             ], 400);
         }
 

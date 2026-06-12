@@ -9,6 +9,7 @@ class AbsensiSantri extends Model
     protected $table = 'student_attendances';
 
     protected $fillable = [
+        'tpq_id',
         'student_id',
         'user_id',
         'attendance_date',

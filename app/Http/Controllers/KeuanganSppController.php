@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\KeuanganSpp;
+use App\Models\Santri;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 
 class KeuanganSppController extends Controller
 {
+    use UsesTpqScope;
+
     public function index()
     {
         return response()->json(
             KeuanganSpp::with([
-                'student:id,name,nisn',
-                'user:id,name,username',
+                'student:id,tpq_id,name,nisn',
+                'user:id,tpq_id,name,username',
             ])
+                ->where('tpq_id', $this->currentTpqId())
                 ->latest('payment_date')
                 ->get()
         );
@@ -31,6 +36,9 @@ class KeuanganSppController extends Controller
             'note' => 'nullable|string',
         ]);
 
+        $this->ensureStudentBelongsToCurrentTpq($validated['student_id'] ?? null);
+
+        $validated['tpq_id'] = $this->currentTpqId();
         $validated['user_id'] = auth()->id();
 
         $payment = KeuanganSpp::create($validated);
@@ -47,8 +55,8 @@ class KeuanganSppController extends Controller
         return response()->json([
             'message' => 'Tuition payment created successfully',
             'data' => $payment->load([
-                'student:id,name,nisn',
-                'user:id,name,username',
+                'student:id,tpq_id,name,nisn',
+                'user:id,tpq_id,name,username',
             ]),
         ], 201);
     }
@@ -56,16 +64,20 @@ class KeuanganSppController extends Controller
     public function show(string $id)
     {
         $payment = KeuanganSpp::with([
-            'student:id,name,nisn',
-            'user:id,name,username',
-        ])->findOrFail($id);
+            'student:id,tpq_id,name,nisn',
+            'user:id,tpq_id,name,username',
+        ])
+            ->where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         return response()->json($payment);
     }
 
     public function update(Request $request, string $id)
     {
-        $payment = KeuanganSpp::findOrFail($id);
+        $payment = KeuanganSpp::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
+
         $oldValues = $payment->toArray();
 
         $validated = $request->validate([
@@ -76,6 +88,10 @@ class KeuanganSppController extends Controller
             'amount' => 'required|numeric|min:0',
             'note' => 'nullable|string',
         ]);
+
+        $this->ensureStudentBelongsToCurrentTpq($validated['student_id'] ?? null);
+
+        unset($validated['tpq_id'], $validated['user_id']);
 
         $payment->update($validated);
 
@@ -90,16 +106,17 @@ class KeuanganSppController extends Controller
 
         return response()->json([
             'message' => 'Tuition payment updated successfully',
-            'data' => $payment->load([
-                'student:id,name,nisn',
-                'user:id,name,username',
+            'data' => $payment->fresh([
+                'student:id,tpq_id,name,nisn',
+                'user:id,tpq_id,name,username',
             ]),
         ]);
     }
 
     public function destroy(string $id)
     {
-        $payment = KeuanganSpp::findOrFail($id);
+        $payment = KeuanganSpp::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         $oldValues = $payment->toArray();
         $amount = $payment->amount;
@@ -118,5 +135,20 @@ class KeuanganSppController extends Controller
         return response()->json([
             'message' => 'Tuition payment deleted successfully',
         ]);
+    }
+
+    private function ensureStudentBelongsToCurrentTpq($studentId): void
+    {
+        if (!$studentId) {
+            return;
+        }
+
+        $exists = Santri::where('id', $studentId)
+            ->where('tpq_id', $this->currentTpqId())
+            ->exists();
+
+        if (!$exists) {
+            abort(422, 'Santri tidak ditemukan pada TPQ ini.');
+        }
     }
 }

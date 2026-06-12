@@ -9,9 +9,11 @@ class KeuanganPembangunan extends Model
     protected $table = 'development_fund_payments';
 
     protected $fillable = [
+        'tpq_id',
         'financial_category_id',
         'user_id',
         'payment_date',
+        'transaction_type',
         'amount',
         'note',
     ];

@@ -10,6 +10,7 @@ class Santri extends Model
 
     protected $fillable = [
         'study_class_id',
+        'tpq_id',
         'student_number',
         'tpq_number',
         'name',
@@ -24,7 +25,7 @@ class Santri extends Model
         'siblings_count',
         'father_name',
         'mother_name',
-        'guardian_phone',
+        'contact_guardian',
         'hamlet',
         'village',
         'district',
@@ -65,5 +66,10 @@ class Santri extends Model
     public function notifications()
     {
         return $this->hasMany(Notification::class, 'student_id');
+    }
+
+    public function tpq()
+    {
+        return $this->belongsTo(Tpq::class);
     }
 }

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Asset extends Model
 {
     protected $fillable = [
+        'tpq_id',
+        'user_id',
         'asset_category_id',
         'asset_code',
         'name',
@@ -32,5 +34,15 @@ class Asset extends Model
     public function category()
     {
         return $this->belongsTo(AssetCategory::class, 'asset_category_id');
+    }
+
+    public function tpq()
+    {
+        return $this->belongsTo(Tpq::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

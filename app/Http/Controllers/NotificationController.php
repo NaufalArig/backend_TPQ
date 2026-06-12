@@ -2,26 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\Notification;
-use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    use UsesTpqScope;
+
     public function index()
     {
-        return response()->json(
-            Notification::with([
-                'student:id,name,birth_date,join_date,status',
-                'user:id,name,username',
-            ])
-                ->latest()
-                ->get()
-        );
+        $notifications = Notification::with([
+            'student:id,tpq_id,name,birth_date,join_date,status',
+            'user:id,tpq_id,name,username',
+        ])
+            ->where('tpq_id', $this->currentTpqId())
+            ->latest()
+            ->get();
+
+        $unread = Notification::where('tpq_id', $this->currentTpqId())
+            ->where('is_read', false)
+            ->count();
+
+        return response()->json([
+            'data' => $notifications,
+            'unread' => $unread,
+        ]);
     }
 
     public function markAsRead(string $id)
     {
-        $notification = Notification::findOrFail($id);
+        $notification = Notification::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         $notification->update([
             'is_read' => true,
@@ -29,15 +40,20 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => 'Notification marked as read',
-            'data' => $notification,
+            'data' => $notification->fresh([
+                'student:id,tpq_id,name,birth_date,join_date,status',
+                'user:id,tpq_id,name,username',
+            ]),
         ]);
     }
 
     public function markAllAsRead()
     {
-        Notification::where('is_read', false)->update([
-            'is_read' => true,
-        ]);
+        Notification::where('tpq_id', $this->currentTpqId())
+            ->where('is_read', false)
+            ->update([
+                'is_read' => true,
+            ]);
 
         return response()->json([
             'message' => 'All notifications marked as read',

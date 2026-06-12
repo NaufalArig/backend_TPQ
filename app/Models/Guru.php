@@ -10,6 +10,7 @@ class Guru extends Model
 
     protected $fillable = [
         'user_id',
+        'tpq_id',
         'teacher_number',
         'tpq_number',
         'name',
@@ -42,5 +43,14 @@ class Guru extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+    public function tpq()
+    {
+        return $this->belongsTo(Tpq::class);
+    }
+
+    public function studyClasses()
+    {
+        return $this->hasMany(Kelas::class);
     }
 }

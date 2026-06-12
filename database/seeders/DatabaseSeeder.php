@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             StudyClassSeeder::class,
             FinancialCategorySeeder::class,
             AssetCategorySeeder::class,
+            TpqSeeder::class,
         ]);
     }
 }

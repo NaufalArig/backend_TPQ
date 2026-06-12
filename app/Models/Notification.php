@@ -9,6 +9,7 @@ class Notification extends Model
     protected $table = 'notifications';
 
     protected $fillable = [
+        'tpq_id',
         'title',
         'message',
         'type',
@@ -29,5 +30,10 @@ class Notification extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+    
+    public function tpq()
+    {
+        return $this->belongsTo(Tpq::class);
     }
 }

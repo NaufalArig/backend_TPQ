@@ -17,6 +17,8 @@ use App\Http\Controllers\KeuanganSppController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\DataExchangeController;
+use App\Http\Controllers\DatabaseBackupController;
 
 // PUBLIC ROUTES
 Route::post('/register', [AuthController::class, 'register']);
@@ -28,6 +30,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // AUTH
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/profile/password', [AuthController::class, 'updatePassword']);
 
     // DASHBOARD
     Route::get('/dashboard', [DashboardController::class, 'index']);
@@ -37,9 +41,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
+    // DATA EXCHANGE
+    Route::get('/data-exchange/{module}/export', [DataExchangeController::class, 'export']);
+    Route::post('/data-exchange/{module}/import', [DataExchangeController::class, 'import']);
+
     // ROLE: ADMIN & TEACHER
     Route::middleware('role:admin,teacher')->group(function () {
         Route::apiResource('santri', SantriController::class);
+
+        // Guru hanya boleh lihat kelas yang dia ajar.
+        Route::get('/kelas', [KelasController::class, 'index']);
+        Route::get('/kelas/{kelas}/available-santri', [KelasController::class, 'availableSantri']);
+        Route::post('/kelas/{kelas}/assign-santri', [KelasController::class, 'assignSantri']);
+        Route::get('/kelas/{kelas}', [KelasController::class, 'show']);
 
         Route::get('/absensi-santri', [AbsensiSantriController::class, 'index']);
         Route::post('/absensi-santri', [AbsensiSantriController::class, 'store']);
@@ -50,14 +64,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('guru', GuruController::class);
         Route::apiResource('users', UserController::class);
-        Route::apiResource('kelas', KelasController::class);
+
+        // Admin yang boleh tambah/edit/hapus kelas.
+        Route::post('/kelas', [KelasController::class, 'store']);
+        Route::put('/kelas/{kelas}', [KelasController::class, 'update']);
+        Route::delete('/kelas/{kelas}', [KelasController::class, 'destroy']);
+
         Route::apiResource('kategori-keuangan', KategoriKeuanganController::class);
 
         Route::apiResource('asset-categories', AssetCategoryController::class);
         Route::apiResource('assets', AssetController::class);
-        
+
         Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+
+        Route::get('/database-backups', [DatabaseBackupController::class, 'index']);
+        Route::post('/database-backups', [DatabaseBackupController::class, 'store']);
+        Route::post('/database-backups/restore', [DatabaseBackupController::class, 'restore']);
+        Route::get('/database-backups/{fileName}/download', [DatabaseBackupController::class, 'download']);
+        Route::post('/database-backups/{fileName}/restore', [DatabaseBackupController::class, 'restoreExisting']);
+        Route::delete('/database-backups/{fileName}', [DatabaseBackupController::class, 'destroy']);
     });
 
     // ROLE: ADMIN & TREASURER

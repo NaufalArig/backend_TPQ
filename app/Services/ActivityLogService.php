@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 
@@ -20,8 +21,17 @@ class ActivityLogService
         $filteredOldValues = self::filterSensitiveData($oldValues);
         $filteredNewValues = self::filterSensitiveData($newValues);
 
+        $resolvedUserId = $userId ?? auth()->id();
+
+        $resolvedTpqId = auth()->user()?->tpq_id;
+
+        if (!$resolvedTpqId && $resolvedUserId) {
+            $resolvedTpqId = User::whereKey($resolvedUserId)->value('tpq_id');
+        }
+
         return ActivityLog::create([
-            'user_id' => $userId ?? auth()->id(),
+            'tpq_id' => $resolvedTpqId,
+            'user_id' => $resolvedUserId,
             'action' => $action,
             'module' => $module,
             'entity_type' => $entity ? class_basename($entity) : null,
@@ -36,7 +46,7 @@ class ActivityLogService
 
     private static function filterSensitiveData(?array $data): ?array
     {
-        if (! $data) {
+        if (!$data) {
             return null;
         }
 

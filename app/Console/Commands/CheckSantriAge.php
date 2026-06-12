@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Santri;
 use App\Models\Notification;
+use App\Models\Santri;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 
 class CheckSantriAge extends Command
 {
@@ -14,23 +14,30 @@ class CheckSantriAge extends Command
 
     public function handle()
     {
-        $santris = Santri::where('notifikasi_usia', false)->get();
+        $santris = Santri::where('age_notification_sent', false)
+            ->whereNotNull('tpq_id')
+            ->whereNotNull('birth_date')
+            ->get();
 
         foreach ($santris as $santri) {
-            $usia = Carbon::parse($santri->tanggal_lahir)->age;
+            $usia = Carbon::parse($santri->birth_date)->age;
 
             if ($usia >= 3) {
                 Notification::create([
-                    'santri_id' => $santri->id,
-                    'judul' => 'Santri mencapai usia 3 tahun',
-                    'pesan' => $santri->nama . ' telah mencapai usia ' . $usia . ' tahun.'
+                    'tpq_id' => $santri->tpq_id,
+                    'student_id' => $santri->id,
+                    'user_id' => null,
+                    'title' => 'Santri mencapai usia 3 tahun',
+                    'message' => $santri->name . ' telah mencapai usia ' . $usia . ' tahun.',
+                    'type' => 'student_age',
+                    'is_read' => false,
                 ]);
 
                 $santri->update([
-                    'notifikasi_usia' => true
+                    'age_notification_sent' => true,
                 ]);
 
-                $this->info('Notifikasi dibuat untuk: ' . $santri->nama);
+                $this->info('Notifikasi dibuat untuk: ' . $santri->name);
             }
         }
 

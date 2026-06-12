@@ -28,6 +28,48 @@
             margin-bottom: 14px;
         }
 
+        .letterhead-tsaubatul {
+            width: 100%;
+            margin-bottom: 14px;
+            padding: 12px 10px 10px;
+            border-bottom: 2px solid #111;
+            color: #111;
+        }
+
+        .letterhead-tsaubatul-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .letterhead-tsaubatul-table td {
+            border: none;
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        .tsaubatul-text {
+            text-align: center;
+        }
+
+        .tsaubatul-name {
+            font-size: 28px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            line-height: 1.15;
+        }
+
+        .tsaubatul-address {
+            margin-top: 8px;
+            font-size: 16px;
+            line-height: 1.25;
+        }
+
+        .tsaubatul-meta {
+            margin-top: 5px;
+            font-size: 13px;
+            line-height: 1.25;
+        }
+
         .letterhead-top {
             background: #642400;
             color: #fff;
@@ -228,6 +270,16 @@
             font-weight: bold;
         }
 
+        .badge-income {
+            color: #166534;
+            font-weight: bold;
+        }
+
+        .badge-expense {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
         .summary-section {
             width: 48%;
             margin-left: auto;
@@ -264,6 +316,12 @@
             font-weight: bold;
         }
 
+        .val-expense {
+            color: #dc2626;
+            text-align: right;
+            font-weight: bold;
+        }
+
         .footer-line {
             border-top: 0.5px solid #d7c2a6;
             margin-top: 24px;
@@ -287,39 +345,57 @@
 </head>
 
 <body>
-    <div class="letterhead">
-        <div class="letterhead-top">
-            <table class="letterhead-top-table">
+    @if (($letterhead['style'] ?? 'barakatul') === 'tsaubatul')
+        <div class="letterhead-tsaubatul">
+            <table class="letterhead-tsaubatul-table">
                 <tr>
-                    <td class="logo-cell">
-                        <img src="{{ public_path('images/qiraati-logo-putih.png') }}" class="qiraati-logo" alt="Logo Qiraati">
-                    </td>
-                    <td class="org-text">
-                        <div class="arabic-line">
-                            <img src="{{ public_path('images/kaligrafi-putih-transparan.png') }}" alt="Kaligrafi">
+                    <td class="tsaubatul-text">
+                        <div class="tsaubatul-name">{{ $letterhead['name'] }}</div>
+                        <div class="tsaubatul-address">{{ $letterhead['address'] }}</div>
+                        <div class="tsaubatul-meta">
+                            {{ $letterhead['registration'] }}
+                            {{ $letterhead['statistic'] }}
                         </div>
-                        <div class="org-label">KOORDINATOR PENDIDIKAN AL-QUR'AN</div>
-                        <div class="method-name">METODE QIRA'ATI</div>
-                        <div class="branch">CABANG BATAM - KEPRI</div>
-                    </td>
-                    <td class="logo-cell">
-                        <div class="logo-box">TPQ</div>
+                        <div class="tsaubatul-meta">{{ $letterhead['phone'] }}</div>
                     </td>
                 </tr>
             </table>
         </div>
+    @else
+        <div class="letterhead">
+            <div class="letterhead-top">
+                <table class="letterhead-top-table">
+                    <tr>
+                        <td class="logo-cell">
+                            <img src="{{ public_path($letterhead['logo'] ?? 'images/qiraati-logo-putih.png') }}" class="qiraati-logo" alt="Logo Qiraati">
+                        </td>
+                        <td class="org-text">
+                            <div class="arabic-line">
+                                <img src="{{ public_path($letterhead['kaligrafi'] ?? 'images/kaligrafi-putih-transparan.png') }}" alt="Kaligrafi">
+                            </div>
+                            <div class="org-label">KOORDINATOR PENDIDIKAN AL-QUR'AN</div>
+                            <div class="method-name">METODE QIRA'ATI</div>
+                            <div class="branch">CABANG BATAM - KEPRI</div>
+                        </td>
+                        <td class="logo-cell">
+                            <div class="logo-box">TPQ</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
 
-        <div class="letterhead-main">
-            <div class="school-small">TAMAN PENDIDIKAN AL-QUR'AN</div>
-            <div class="school-name">BARAKATUL QUR'AN</div>
-            <div class="school-number">NOMOR INDUK : 06.02.03.001</div>
-            <div class="school-address">
-                Perum. GMP Blok N No. 85-86, Kel. Duriangkang,<br>
-                Kec. Sungai Beduk, Kota Batam, Kepri<br>
-                Telp. 0813 7283 6025
+            <div class="letterhead-main">
+                <div class="school-small">TAMAN PENDIDIKAN AL-QUR'AN</div>
+                <div class="school-name">{{ $letterhead['school_name'] ?? "BARAKATUL QUR'AN" }}</div>
+                <div class="school-number">NOMOR INDUK : {{ $letterhead['school_number'] ?? '06.02.03.001' }}</div>
+                <div class="school-address">
+                    @foreach (($letterhead['address_lines'] ?? []) as $line)
+                        {{ $line }}@if (!$loop->last)<br>@endif
+                    @endforeach
+                </div>
             </div>
         </div>
-    </div>
+    @endif
 
     <div class="report-title">{{ $reportTitle ?? 'Laporan Keuangan' }}</div>
     <div class="report-date">
@@ -327,6 +403,13 @@
         {{ $dateFrom ? \Carbon\Carbon::parse($dateFrom)->format('d-m-Y') : 'Awal' }}
         s/d
         {{ $dateTo ? \Carbon\Carbon::parse($dateTo)->format('d-m-Y') : 'Akhir' }}
+        @if (!empty($search))
+            | Pencarian: {{ $search }}
+        @endif
+        @if (!empty($transactionType))
+            | Jenis:
+            {{ $transactionType === 'expense' ? 'Pengeluaran' : 'Pemasukan' }}
+        @endif
         | Tanggal Cetak: {{ date('d-m-Y') }}
     </div>
     <hr class="divider">
@@ -361,8 +444,10 @@
                         <td class="td-center">
                             @if ($item['type'] === 'SPP')
                                 <span class="badge-spp">SPP</span>
+                            @elseif (($item['transaction_type'] ?? 'income') === 'expense')
+                                <span class="badge-expense">Pembangunan - Pengeluaran</span>
                             @else
-                                <span class="badge-pembangunan">Pembangunan</span>
+                                <span class="badge-income">Pembangunan - Pemasukan</span>
                             @endif
                         </td>
 
@@ -379,7 +464,11 @@
                         </td>
 
                         <td class="td-right">
-                            Rp {{ number_format($item['amount'], 0, ',', '.') }}
+                            @if (($item['transaction_type'] ?? 'income') === 'expense')
+                                <span class="val-expense">- Rp {{ number_format($item['amount'], 0, ',', '.') }}</span>
+                            @else
+                                Rp {{ number_format($item['amount'], 0, ',', '.') }}
+                            @endif
                         </td>
 
                         <td>
@@ -410,13 +499,25 @@
                     </td>
                 </tr>
                 <tr>
-                    <td>Total Pembangunan</td>
+                    <td>Pemasukan Pembangunan</td>
+                    <td class="val-total">
+                        Rp {{ number_format($totalPembangunanPemasukan ?? $totalPembangunan, 0, ',', '.') }}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Pengeluaran Pembangunan</td>
+                    <td class="val-expense">
+                        - Rp {{ number_format($totalPembangunanPengeluaran ?? 0, 0, ',', '.') }}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Saldo Pembangunan</td>
                     <td class="val-total">
                         Rp {{ number_format($totalPembangunan, 0, ',', '.') }}
                     </td>
                 </tr>
                 <tr class="saldo-row">
-                    <td>Total Pemasukan</td>
+                    <td>Total Saldo</td>
                     <td class="val-total">
                         Rp {{ number_format($totalPemasukan, 0, ',', '.') }}
                     </td>

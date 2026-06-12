@@ -11,6 +11,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('check:santri-age')->daily();
         $schedule->command('guru:update-status')->daily();
+        $schedule->command('backup:database')->weeklyOn(1, '02:00');
     }
 
     protected function commands(): void

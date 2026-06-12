@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\Asset;
+use App\Models\AssetCategory;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -10,9 +12,15 @@ use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
+    use UsesTpqScope;
+
     public function index(Request $request)
     {
-        $query = Asset::with('category:id,name,status');
+        $query = Asset::with([
+            'category:id,tpq_id,name,status',
+            'user:id,tpq_id,name,username',
+        ])
+            ->where('tpq_id', $this->currentTpqId());
 
         if ($request->filled('asset_category_id')) {
             $query->where('asset_category_id', $request->asset_category_id);
@@ -47,7 +55,13 @@ class AssetController extends Controller
     {
         $validated = $request->validate([
             'asset_category_id' => 'nullable|exists:asset_categories,id',
-            'asset_code' => 'nullable|string|max:255|unique:assets,asset_code',
+            'asset_code' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('assets', 'asset_code')
+                    ->where('tpq_id', $this->currentTpqId()),
+            ],
             'name' => 'required|string|max:255',
             'brand' => 'nullable|string|max:255',
             'quantity' => 'required|integer|min:1',
@@ -61,6 +75,11 @@ class AssetController extends Controller
             'photo' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
             'note' => 'nullable|string',
         ]);
+
+        $this->ensureCategoryBelongsToCurrentTpq($validated['asset_category_id'] ?? null);
+
+        $validated['tpq_id'] = $this->currentTpqId();
+        $validated['user_id'] = auth()->id();
 
         if ($request->hasFile('photo')) {
             $validated['photo'] = $request->file('photo')
@@ -80,20 +99,30 @@ class AssetController extends Controller
 
         return response()->json([
             'message' => 'Asset created successfully',
-            'data' => $asset->load('category:id,name,status'),
+            'data' => $asset->load([
+                'category:id,tpq_id,name,status',
+                'user:id,tpq_id,name,username',
+            ]),
         ], 201);
     }
 
     public function show(string $id)
     {
-        return response()->json(
-            Asset::with('category:id,name,status')->findOrFail($id)
-        );
+        $asset = Asset::with([
+            'category:id,tpq_id,name,status',
+            'user:id,tpq_id,name,username',
+        ])
+            ->where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
+
+        return response()->json($asset);
     }
 
     public function update(Request $request, string $id)
     {
-        $asset = Asset::findOrFail($id);
+        $asset = Asset::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
+
         $oldValues = $asset->toArray();
 
         $validated = $request->validate([
@@ -102,7 +131,9 @@ class AssetController extends Controller
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('assets', 'asset_code')->ignore($asset->id),
+                Rule::unique('assets', 'asset_code')
+                    ->where('tpq_id', $this->currentTpqId())
+                    ->ignore($asset->id),
             ],
             'name' => 'required|string|max:255',
             'brand' => 'nullable|string|max:255',
@@ -117,6 +148,10 @@ class AssetController extends Controller
             'photo' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
             'note' => 'nullable|string',
         ]);
+
+        $this->ensureCategoryBelongsToCurrentTpq($validated['asset_category_id'] ?? null);
+
+        unset($validated['tpq_id'], $validated['user_id']);
 
         if ($request->hasFile('photo')) {
             if ($asset->photo) {
@@ -142,13 +177,17 @@ class AssetController extends Controller
 
         return response()->json([
             'message' => 'Asset updated successfully',
-            'data' => $asset->fresh('category:id,name,status'),
+            'data' => $asset->fresh([
+                'category:id,tpq_id,name,status',
+                'user:id,tpq_id,name,username',
+            ]),
         ]);
     }
 
     public function destroy(string $id)
     {
-        $asset = Asset::findOrFail($id);
+        $asset = Asset::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         $oldValues = $asset->toArray();
         $assetName = $asset->name;
@@ -171,5 +210,20 @@ class AssetController extends Controller
         return response()->json([
             'message' => 'Asset deleted successfully',
         ]);
+    }
+
+    private function ensureCategoryBelongsToCurrentTpq($categoryId): void
+    {
+        if (!$categoryId) {
+            return;
+        }
+
+        $exists = AssetCategory::where('id', $categoryId)
+            ->where('tpq_id', $this->currentTpqId())
+            ->exists();
+
+        if (!$exists) {
+            abort(422, 'Kategori aset tidak ditemukan pada TPQ ini.');
+        }
     }
 }

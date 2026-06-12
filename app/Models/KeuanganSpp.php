@@ -10,6 +10,7 @@ class KeuanganSpp extends Model
 
     protected $fillable = [
         'student_id',
+        'tpq_id',
         'user_id',
         'payment_date',
         'month',

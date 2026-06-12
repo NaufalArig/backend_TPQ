@@ -9,6 +9,7 @@ class KategoriKeuangan extends Model
     protected $table = 'financial_categories';
 
     protected $fillable = [
+        'tpq_id',
         'name',
         'description',
         'status',

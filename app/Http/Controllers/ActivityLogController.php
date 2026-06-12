@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 
 class ActivityLogController extends Controller
 {
+    use UsesTpqScope;
+
     public function index(Request $request)
     {
-        $query = ActivityLog::with('user:id,name,username,role');
+        $query = ActivityLog::with('user:id,tpq_id,name,username,role')
+            ->where('tpq_id', $this->currentTpqId());
 
         if ($request->filled('action')) {
             $query->where('action', $request->action);
@@ -49,7 +53,8 @@ class ActivityLogController extends Controller
 
     public function show(string $id)
     {
-        $log = ActivityLog::with('user:id,name,username,role')
+        $log = ActivityLog::with('user:id,tpq_id,name,username,role')
+            ->where('tpq_id', $this->currentTpqId())
             ->findOrFail($id);
 
         return response()->json($log);

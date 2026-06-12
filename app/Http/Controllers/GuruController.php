@@ -2,20 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\Guru;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ActivityLogService;
 
 class GuruController extends Controller
 {
+    use UsesTpqScope;
+
     public function index()
     {
         return response()->json(
-            Guru::with('user:id,name,username,email,role,status')
+            Guru::with('user:id,tpq_id,name,username,email,role,status')
+                ->where('tpq_id', $this->currentTpqId())
                 ->latest()
                 ->get()
         );
@@ -60,10 +65,11 @@ class GuruController extends Controller
 
         $teacher = DB::transaction(function () use ($validated) {
             $user = User::create([
+                'tpq_id' => $this->currentTpqId(),
                 'name' => $validated['name'],
                 'username' => $validated['username'],
                 'email' => $validated['email'] ?? null,
-                'password' => $validated['password'],
+                'password' => Hash::make($validated['password']),
                 'role' => 'teacher',
                 'status' => 'active',
             ]);
@@ -72,6 +78,7 @@ class GuruController extends Controller
 
             return Guru::create([
                 ...$validated,
+                'tpq_id' => $this->currentTpqId(),
                 'user_id' => $user->id,
                 'age_notification_sent' => false,
             ]);
@@ -88,13 +95,14 @@ class GuruController extends Controller
 
         return response()->json([
             'message' => 'Teacher created successfully',
-            'data' => $teacher->load('user:id,name,username,email,role,status'),
+            'data' => $teacher->load('user:id,tpq_id,name,username,email,role,status'),
         ], 201);
     }
 
     public function show(string $id)
     {
-        $teacher = Guru::with('user:id,name,username,email,role,status')
+        $teacher = Guru::with('user:id,tpq_id,name,username,email,role,status')
+            ->where('tpq_id', $this->currentTpqId())
             ->findOrFail($id);
 
         return response()->json($teacher);
@@ -102,9 +110,10 @@ class GuruController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $teacher = Guru::findOrFail($id);
-        $oldValues = $teacher->toArray();
+        $teacher = Guru::where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
+        $oldValues = $teacher->toArray();
 
         $validated = $request->validate([
             'teacher_number' => 'nullable|string|max:255',
@@ -152,10 +161,13 @@ class GuruController extends Controller
         }
 
         DB::transaction(function () use ($teacher, $validated) {
+            unset($validated['tpq_id']);
+
             $teacher->update($validated);
 
             if ($teacher->user) {
                 $teacher->user->update([
+                    'tpq_id' => $this->currentTpqId(),
                     'name' => $validated['name'],
                     'status' => $validated['status'] === 'inactive' ? 'inactive' : 'active',
                 ]);
@@ -173,13 +185,15 @@ class GuruController extends Controller
 
         return response()->json([
             'message' => 'Teacher updated successfully',
-            'data' => $teacher->fresh('user:id,name,username,email,role,status'),
+            'data' => $teacher->fresh('user:id,tpq_id,name,username,email,role,status'),
         ]);
     }
 
     public function destroy(string $id)
     {
-        $teacher = Guru::with('user')->findOrFail($id);
+        $teacher = Guru::with('user')
+            ->where('tpq_id', $this->currentTpqId())
+            ->findOrFail($id);
 
         $oldValues = $teacher->toArray();
         $teacherName = $teacher->name;
