@@ -99,7 +99,7 @@ class AbsensiSantriController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'attendance_date' => 'required|date',
+            'attendance_date' => 'required|date|before_or_equal:today',
             'attendances' => 'required|array|min:1',
             'attendances.*.student_id' => 'required|exists:students,id',
             'attendances.*.status' => 'required|in:present,permission,sick,absent',
@@ -167,6 +167,29 @@ class AbsensiSantriController extends Controller
         if ($request->filled('student_id')) {
             $this->ensureStudentCanBeAccessed($request->student_id);
             $query->where('student_id', $request->student_id);
+        }
+
+        if ($request->filled('study_class_id')) {
+            $kelas = Kelas::where('id', $request->study_class_id)
+                ->where('tpq_id', $this->currentTpqId())
+                ->first();
+
+            if (!$kelas) {
+                abort(422, 'Kelas tidak ditemukan pada TPQ ini.');
+            }
+
+            if ($user->role === 'teacher') {
+                $classIds = $this->getTeacherClassIds();
+
+                if (!$classIds->contains((int) $request->study_class_id)) {
+                    abort(403, 'Anda tidak memiliki akses ke kelas ini.');
+                }
+            }
+
+            $query->whereHas('student', function ($q) use ($request) {
+                $q->where('tpq_id', $this->currentTpqId())
+                    ->where('study_class_id', $request->study_class_id);
+            });
         }
 
         if ($request->filled('status')) {

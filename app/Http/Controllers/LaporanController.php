@@ -46,6 +46,7 @@ class LaporanController extends Controller
 
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
+        $filterMonth = $request->get('filter_month');
         $type = $request->get('type', 'all');
         $search = trim((string) $request->get('search', ''));
         $transactionType = $request->get('transaction_type');
@@ -70,6 +71,13 @@ class LaporanController extends Controller
         if ($dateTo) {
             $sppQuery->whereDate('payment_date', '<=', $dateTo);
             $pembangunanQuery->whereDate('payment_date', '<=', $dateTo);
+        }
+
+        if ($filterMonth) {
+            $sppQuery->whereDate('payment_date', '>=', $filterMonth . '-01')
+                ->whereDate('payment_date', '<=', date('Y-m-t', strtotime($filterMonth . '-01')));
+            $pembangunanQuery->whereDate('payment_date', '>=', $filterMonth . '-01')
+                ->whereDate('payment_date', '<=', date('Y-m-t', strtotime($filterMonth . '-01')));
         }
 
         if ($transactionType && in_array($transactionType, ['income', 'expense'], true)) {
@@ -216,6 +224,7 @@ class LaporanController extends Controller
             'totalPemasukan',
             'dateFrom',
             'dateTo',
+            'filterMonth',
             'type',
             'search',
             'transactionType',
@@ -239,6 +248,7 @@ class LaporanController extends Controller
                 'type' => $request->get('type', 'all'),
                 'date_from' => $request->get('date_from'),
                 'date_to' => $request->get('date_to'),
+                'filter_month' => $request->get('filter_month'),
                 'search' => $request->get('search'),
                 'transaction_type' => $request->get('transaction_type'),
                 'mode' => 'preview',
@@ -275,6 +285,7 @@ class LaporanController extends Controller
                 'type' => $type,
                 'date_from' => $request->get('date_from'),
                 'date_to' => $request->get('date_to'),
+                'filter_month' => $request->get('filter_month'),
                 'search' => $request->get('search'),
                 'transaction_type' => $request->get('transaction_type'),
                 'mode' => 'download_pdf',

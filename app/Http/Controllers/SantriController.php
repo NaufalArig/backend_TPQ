@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\Guru;
 use App\Models\Kelas;
+use App\Models\Notification;
 use App\Models\Santri;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -123,6 +124,8 @@ class SantriController extends Controller
         }
 
         $student = Santri::create($validated);
+
+        $this->createAgeNotificationIfNeeded($student);
 
         ActivityLogService::log(
             action: 'create',
@@ -248,7 +251,14 @@ class SantriController extends Controller
             unset($validated['birth_certificate_file']);
         }
 
+
+        if ($student->birth_date !== $validated['birth_date']) {
+            $validated['age_notification_sent'] = false;
+        }
+        
         $student->update($validated);
+
+        $this->createAgeNotificationIfNeeded($student->fresh());
 
         ActivityLogService::log(
             action: 'update',
@@ -297,6 +307,43 @@ class SantriController extends Controller
 
         return response()->json([
             'message' => 'Student deleted successfully',
+        ]);
+    }
+
+    public function activate(string $id)
+    {
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Hanya admin yang dapat mengaktifkan santri.');
+        }
+
+        $student = Santri::where('tpq_id', $this->currentTpqId())
+            ->where('status', 'pending')
+            ->findOrFail($id);
+
+        if (!$student->join_date || now()->startOfDay()->lt(Carbon::parse($student->join_date)->startOfDay())) {
+            return response()->json([
+                'message' => 'Santri belum mencapai usia 3 tahun.',
+            ], 422);
+        }
+
+        $oldValues = $student->toArray();
+
+        $student->update([
+            'status' => 'active',
+        ]);
+
+        ActivityLogService::log(
+            action: 'update',
+            module: 'students',
+            entity: $student,
+            oldValues: $oldValues,
+            newValues: $student->fresh()->toArray(),
+            description: 'Activated student manually: ' . $student->name
+        );
+
+        return response()->json([
+            'message' => 'Santri berhasil diaktifkan.',
+            'data' => $student->fresh('studyClass'),
         ]);
     }
 
@@ -373,14 +420,60 @@ class SantriController extends Controller
         if (in_array($currentStatus, ['graduated', 'left'])) {
             $status = $currentStatus;
         } else {
-            $status = now()->greaterThanOrEqualTo($joinDate)
-                ? 'active'
-                : 'pending';
+            $status = $currentStatus === 'active' ? 'active' : 'pending';
         }
 
         return [
             'join_date' => $joinDate->format('Y-m-d'),
             'status' => $status,
         ];
+    }
+
+    private function createAgeNotificationIfNeeded(Santri $student): void
+    {
+        if (
+            $student->status !== 'pending' ||
+            !$student->tpq_id ||
+            !$student->join_date
+        ) {
+            return;
+        }
+
+        $joinDate = Carbon::parse($student->join_date)->startOfDay();
+        $daysLeft = now()->startOfDay()->diffInDays($joinDate, false);
+
+        if ($daysLeft > 7) {
+            return;
+        }
+
+        $type = $daysLeft > 0 ? 'student_age_warning' : 'student_age_due';
+
+        $exists = Notification::where('tpq_id', $student->tpq_id)
+            ->where('student_id', $student->id)
+            ->where('type', $type)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        if ($daysLeft > 0) {
+            $title = 'Santri Hampir Siap Diaktifkan';
+            $message = $student->name . ' akan mencapai usia 3 tahun pada ' .
+                $joinDate->format('d-m-Y') . '. Siapkan proses aktivasi santri.';
+        } else {
+            $title = 'Santri Perlu Diaktifkan';
+            $message = $student->name . ' sudah mencapai usia 3 tahun. Segera aktifkan santri dan hubungi wali santri.';
+        }
+
+        Notification::create([
+            'tpq_id' => $student->tpq_id,
+            'student_id' => $student->id,
+            'user_id' => auth()->id(),
+            'title' => $title,
+            'message' => $message,
+            'type' => $type,
+            'is_read' => false,
+        ]);
     }
 }

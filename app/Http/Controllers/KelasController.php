@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\Guru;
 use App\Models\Kelas;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\Santri;
@@ -158,7 +159,18 @@ class KelasController extends Controller
             ], 400);
         }
 
+        $oldValues = $kelas->toArray();
+
         $kelas->delete();
+
+        ActivityLogService::log(
+            action: 'delete',
+            module: 'classes',
+            entity: $kelas,
+            oldValues: $oldValues,
+            newValues: null,
+            description: 'Deleted class: ' . ($oldValues['name'] ?? $kelas->id)
+        );
 
         return response()->json([
             'message' => 'Class deleted successfully',

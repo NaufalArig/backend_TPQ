@@ -246,17 +246,29 @@ class DashboardController extends Controller
             'pending_students_list' => Santri::with('studyClass:id,name')
                 ->where('tpq_id', $tpqId)
                 ->where('status', 'pending')
-                ->latest()
-                ->take(5)
-                ->get([
-                    'id',
-                    'tpq_id',
-                    'study_class_id',
-                    'name',
-                    'birth_date',
-                    'join_date',
-                    'status',
-                ]),
+                ->whereNotNull('join_date')
+                ->orderByRaw('join_date ASC')
+                ->take(10)
+                ->get(['id', 'tpq_id', 'study_class_id', 'name', 'birth_date', 'join_date', 'status'])
+                ->map(function ($s) {
+                    $joinDate = \Carbon\Carbon::parse($s->join_date)->startOfDay();
+                    $daysLeft = now()->startOfDay()->diffInDays($joinDate, false);
+
+                    if ($daysLeft <= 0) {
+                        $activationStatus = 'due';
+                    } elseif ($daysLeft <= 7) {
+                        $activationStatus = 'soon';
+                    } else {
+                        $activationStatus = 'waiting';
+                    }
+
+                    return array_merge($s->toArray(), [
+                        'days_left'         => (int) $daysLeft,
+                        'activation_status' => $activationStatus,
+                    ]);
+                })
+                ->sortBy('days_left')
+                ->values(),
 
             'latest_transactions' => $latestTransactions,
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\UsesTpqScope;
 use App\Models\KategoriKeuangan;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -91,7 +92,18 @@ class KategoriKeuanganController extends Controller
             ], 400);
         }
 
+        $oldValues = $category->toArray();
+
         $category->delete();
+
+        ActivityLogService::log(
+            action: 'delete',
+            module: 'financial_categories',
+            entity: $category,
+            oldValues: $oldValues,
+            newValues: null,
+            description: 'Deleted financial category: ' . ($oldValues['name'] ?? $category->id)
+        );
 
         return response()->json([
             'message' => 'Financial category deleted successfully',

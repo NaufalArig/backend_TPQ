@@ -37,9 +37,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // NOTIFICATION
-    Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-    Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::put('/notifications/read-all', [NotificationController::class, 'readAll']);
+        Route::delete('/notifications/delete-all', [NotificationController::class, 'destroyAll']);
+        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    });
 
     // DATA EXCHANGE
     Route::get('/data-exchange/{module}/export', [DataExchangeController::class, 'export']);
@@ -48,8 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // ROLE: ADMIN & TEACHER
     Route::middleware('role:admin,teacher')->group(function () {
         Route::apiResource('santri', SantriController::class);
+        Route::post('/santri/{id}/activate', [SantriController::class, 'activate']);
 
-        // Guru hanya boleh lihat kelas yang dia ajar.
         Route::get('/kelas', [KelasController::class, 'index']);
         Route::get('/kelas/{kelas}/available-santri', [KelasController::class, 'availableSantri']);
         Route::post('/kelas/{kelas}/assign-santri', [KelasController::class, 'assignSantri']);

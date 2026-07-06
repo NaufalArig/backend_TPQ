@@ -9,7 +9,7 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('check:santri-age')->daily();
+        $schedule->command('check:santri-age')->dailyAt('07:00');
         $schedule->command('guru:update-status')->daily();
         $schedule->command('backup:database')->weeklyOn(1, '02:00');
     }
