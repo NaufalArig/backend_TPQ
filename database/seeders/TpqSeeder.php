@@ -38,7 +38,9 @@ class TpqSeeder extends Seeder
                 'tpq_id' => $tpq1->id,
                 'name' => 'Admin Barokatul',
                 'email' => 'admin.barokatul@example.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make(
+                    env('DEFAULT_TPQ_PASSWORD', 'ChangeMe123!')
+                ),
                 'role' => 'admin',
                 'status' => 'active',
             ]
@@ -50,7 +52,9 @@ class TpqSeeder extends Seeder
                 'tpq_id' => $tpq2->id,
                 'name' => 'Admin Tsaubatul',
                 'email' => 'admin.tsaubatul@example.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make(
+                    env('DEFAULT_TPQ_PASSWORD', 'ChangeMe123!')
+                ),
                 'role' => 'admin',
                 'status' => 'active',
             ]
