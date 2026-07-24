@@ -21,7 +21,6 @@ use App\Http\Controllers\DataExchangeController;
 use App\Http\Controllers\DatabaseBackupController;
 
 // PUBLIC ROUTES
-Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 // PROTECTED ROUTES
@@ -37,12 +36,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // NOTIFICATION
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/notifications', [NotificationController::class, 'index']);
-        Route::put('/notifications/read-all', [NotificationController::class, 'readAll']);
-        Route::delete('/notifications/delete-all', [NotificationController::class, 'destroyAll']);
-        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
-    });
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::delete('/notifications/delete-all', [NotificationController::class, 'destroyAll']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
 
     // DATA EXCHANGE
     Route::get('/data-exchange/{module}/export', [DataExchangeController::class, 'export']);
