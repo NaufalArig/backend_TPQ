@@ -47,11 +47,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // DATA EXCHANGE
     Route::get('/data-exchange/{module}/export', [DataExchangeController::class, 'export']);
     Route::post('/data-exchange/{module}/import', [DataExchangeController::class, 'import']);
+    Route::get('/data-exchange/{module}/template', [DataExchangeController::class, 'template']);
 
     // ROLE: ADMIN & TEACHER
     Route::middleware('role:admin,teacher')->group(function () {
         Route::apiResource('santri', SantriController::class);
         Route::post('/santri/{id}/activate', [SantriController::class, 'activate']);
+        Route::post('/santri/{id}/graduate', [SantriController::class, 'graduate']);
 
         Route::get('/kelas', [KelasController::class, 'index']);
         Route::get('/kelas/{kelas}/available-santri', [KelasController::class, 'availableSantri']);

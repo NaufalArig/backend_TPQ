@@ -13,6 +13,22 @@ class LaporanController extends Controller
 {
     use UsesTpqScope;
 
+
+    private const BULAN_LABEL = [
+        1 => 'Januari',
+        2 => 'Februari',
+        3 => 'Maret',
+        4 => 'April',
+        5 => 'Mei',
+        6 => 'Juni',
+        7 => 'Juli',
+        8 => 'Agustus',
+        9 => 'September',
+        10 => 'Oktober',
+        11 => 'November',
+        12 => 'Desember',
+    ];
+
     private function getLetterhead(int $tpqId): array
     {
         if ($tpqId === 2) {
@@ -51,6 +67,8 @@ class LaporanController extends Controller
         $search = trim((string) $request->get('search', ''));
         $transactionType = $request->get('transaction_type');
 
+        $year = $request->get('year');
+
         $sppQuery = KeuanganSpp::with([
             'student:id,tpq_id,name,nisn',
             'user:id,tpq_id,name,username',
@@ -74,10 +92,21 @@ class LaporanController extends Controller
         }
 
         if ($filterMonth) {
-            $sppQuery->whereDate('payment_date', '>=', $filterMonth . '-01')
-                ->whereDate('payment_date', '<=', date('Y-m-t', strtotime($filterMonth . '-01')));
+            $fmYear = (int) substr($filterMonth, 0, 4);
+            $fmMonth = (int) substr($filterMonth, 5, 2);
+
+            // SPP difilter berdasarkan field year/month (periode SPP-nya),
+            // BUKAN payment_date (tanggal bayar aktual) — supaya pembayaran telat
+            // tetap masuk ke laporan periode yang benar, bukan periode saat dibayar.
+            $sppQuery->where('year', $fmYear)->where('month', $fmMonth);
+
+            // Pembangunan tidak punya konsep periode (tidak ada field month/year),
+            // jadi tetap difilter pakai payment_date seperti semula.
             $pembangunanQuery->whereDate('payment_date', '>=', $filterMonth . '-01')
                 ->whereDate('payment_date', '<=', date('Y-m-t', strtotime($filterMonth . '-01')));
+        } elseif ($year && !$dateFrom && !$dateTo) {
+            $sppQuery->where('year', $year);
+            $pembangunanQuery->whereYear('payment_date', $year);
         }
 
         if ($transactionType && in_array($transactionType, ['income', 'expense'], true)) {
@@ -208,10 +237,46 @@ class LaporanController extends Controller
         $totalPemasukan = $totalSpp + $totalPembangunan;
 
         $reportTitle = match ($type) {
-            'spp' => 'Laporan Keuangan SPP',
+            'spp' => $this->buildSppReportTitle($filterMonth, $year),
             'pembangunan' => 'Laporan Keuangan Pembangunan',
             default => 'Laporan Keuangan',
         };
+
+        $sppSummary = null;
+
+        if ($type === 'spp') {
+            $summaryYear = $filterMonth
+                ? (int) substr($filterMonth, 0, 4)
+                : ($year ? (int) $year : (int) now()->format('Y'));
+            $summaryMonth = $filterMonth ? (int) substr($filterMonth, 5, 2) : null;
+
+            // ASUMSI (belum dikonfirmasi user): hanya status 'active' dihitung.
+            // Ganti whereIn(['active','pending']) bila santri pending wajib bayar SPP.
+            $totalSantri = \App\Models\Santri::where('tpq_id', $tpqId)
+                ->where('status', 'active')
+                ->count();
+
+            $paidQuery = KeuanganSpp::where('tpq_id', $tpqId)->where('year', $summaryYear);
+
+            if ($summaryMonth) {
+                $paidQuery->where('month', $summaryMonth);
+            }
+
+            // ASUMSI (belum dikonfirmasi user): "sudah membayar" saat mode Semua Bulan
+            // = minimal 1 bulan terbayar sepanjang tahun tsb, bukan lunas 12 bulan.
+            $paidCount = (clone $paidQuery)->distinct('student_id')->count('student_id');
+
+            $sppSummary = [
+                'year' => $summaryYear,
+                'month' => $summaryMonth,
+                'month_label' => $summaryMonth ? (self::BULAN_LABEL[$summaryMonth] ?? '-') : 'Semua Bulan',
+                'print_date' => now()->format('d-m-Y'),
+                'total_santri' => $totalSantri,
+                'sudah_membayar' => $paidCount,
+                'belum_membayar' => max($totalSantri - $paidCount, 0),
+                'total_pemasukan' => $totalSpp,
+            ];
+        }
 
         $letterhead = $this->getLetterhead($tpqId);
 
@@ -229,8 +294,25 @@ class LaporanController extends Controller
             'search',
             'transactionType',
             'reportTitle',
-            'letterhead'
+            'letterhead',
+            'sppSummary'
         );
+    }
+
+    private function buildSppReportTitle(?string $filterMonth, ?string $year): string
+    {
+        if ($filterMonth) {
+            $y = (int) substr($filterMonth, 0, 4);
+            $m = (int) substr($filterMonth, 5, 2);
+            $label = self::BULAN_LABEL[$m] ?? '';
+            return "Laporan Pembayaran SPP Bulan {$label} Tahun {$y}";
+        }
+
+        if ($year) {
+            return "Laporan Pembayaran SPP Tahun {$year}";
+        }
+
+        return 'Laporan Keuangan SPP';
     }
 
     public function preview(Request $request)

@@ -66,6 +66,7 @@ class DataExchangeController extends Controller
                     'status' => 'pending',
                     'student_type' => 'regular',
                 ],
+                'hidden_export' => ['id', 'study_class_id'],
             ],
             'guru' => [
                 'model' => Guru::class,
@@ -207,11 +208,19 @@ class DataExchangeController extends Controller
             $query->where('tpq_id', $request->user()->tpq_id);
         }
 
+        // urut naik: pakai 'name' bila ada, kalau tidak pakai 'id'
+        $orderColumn = in_array('name', $config['columns'], true) ? 'name' : 'id';
+
         $rows = $query
-            ->latest('id')
+            ->orderBy($orderColumn)
             ->get()
-            ->map(fn (Model $item) => $this->mapModelToRow($item, $columns))
+            ->map(fn(Model $item) => $this->mapModelToRow($item, $columns))
             ->values()
+            ->all();
+
+        // tambahkan nomor urut 1,2,3... di kolom pertama
+        $rows = collect($rows)
+            ->map(fn(array $row, int $i) => array_merge([$i + 1], $row))
             ->all();
 
         ActivityLogService::log(
@@ -227,9 +236,9 @@ class DataExchangeController extends Controller
 
         return Excel::download(
             new DataRowsExport(
-                $this->exportHeadings($config, $columns),
+                array_merge(['No'], $this->exportHeadings($config, $columns)), // ⬅️ header "No" di depan
                 $rows,
-                $this->exportTextColumnLetters($config, $columns)
+                $this->exportTextColumnLetters($config, $columns, 2)           // ⬅️ offset 2 (geser karena kolom No)
             ),
             $fileName
         );
@@ -299,6 +308,60 @@ class DataExchangeController extends Controller
         ]);
     }
 
+    public function template(Request $request, string $module)
+    {
+        $config = $this->resolveModule($request, $module);
+
+        // kolom yang tidak perlu diisi user saat import baru
+        $skip = array_merge(['id', 'user_id', 'study_class_id', 'tpq_id'], $config['hidden_export'] ?? []);
+        $columns = array_values(array_filter(
+            $config['columns'],
+            fn(string $column) => !in_array($column, $skip, true)
+        ));
+
+        $headings = $this->exportHeadings($config, $columns);
+        $example  = $this->templateExampleRow($config['label'], $columns);
+
+        return Excel::download(
+            new DataRowsExport(
+                $headings,
+                $example ? [$example] : [],
+                $this->exportTextColumnLetters($config, $columns, 1) // tanpa kolom No → offset 1
+            ),
+            'template-import-' . $config['label'] . '.xlsx'
+        );
+    }
+
+    private function templateExampleRow(string $label, array $columns): array
+    {
+        $examples = [
+            'santri' => [
+                'student_number' => 'S-001',
+                'name'           => 'Ahmad Contoh',
+                'nisn'           => '1234567890',
+                'nik'            => '1234567890123456',
+                'gender'         => 'L',
+                'birth_place'    => 'Batam',
+                'birth_date'     => '2021-05-10',
+                'student_type'   => 'Biasa',
+                'status'         => 'Aktif',
+            ],
+            'guru' => [
+                'teacher_number' => 'G-001',
+                'name'           => 'Ustadz Contoh',
+                'gender'         => 'L',
+                'birth_place'    => 'Batam',
+                'birth_date'     => '1990-01-01',
+                'phone'          => '081234567890',
+                'status'         => 'Aktif',
+            ],
+        ];
+
+        $map = $examples[$label] ?? [];
+
+        return collect($columns)->map(fn(string $c) => $map[$c] ?? '')->all();
+    }
+
     private function readSpreadsheetRows(string $path): array
     {
         $reader = IOFactory::createReaderForFile($path);
@@ -354,7 +417,7 @@ class DataExchangeController extends Controller
 
         return array_values(array_filter(
             $config['columns'],
-            fn (string $column) => !in_array($column, $hidden, true)
+            fn(string $column) => !in_array($column, $hidden, true)
         ));
     }
 
@@ -378,11 +441,11 @@ class DataExchangeController extends Controller
         $labels = $this->headingLabels($config['label']);
 
         return collect($columns)
-            ->map(fn (string $column) => $labels[$column] ?? Str::headline($column))
+            ->map(fn(string $column) => $labels[$column] ?? Str::headline($column))
             ->all();
     }
 
-    private function exportTextColumnLetters(array $config, array $columns): array
+    private function exportTextColumnLetters(array $config, array $columns, int $offset = 1): array
     {
         $textColumns = $config['text_export_columns'] ?? [
             'student_number',
@@ -397,11 +460,10 @@ class DataExchangeController extends Controller
 
         return collect($columns)
             ->values()
-            ->filter(fn (string $column) => in_array($column, $textColumns, true))
-            ->map(function (string $column) use ($columns) {
+            ->filter(fn(string $column) => in_array($column, $textColumns, true))
+            ->map(function (string $column) use ($columns, $offset) {          // ⬅️ pakai $offset
                 $index = array_search($column, $columns, true);
-
-                return Coordinate::stringFromColumnIndex($index + 1);
+                return Coordinate::stringFromColumnIndex($index + $offset);
             })
             ->values()
             ->all();
@@ -481,7 +543,7 @@ class DataExchangeController extends Controller
         [$headings, $dataStartIndex] = $this->resolveHeadings($sheet, $config, $headerIndex);
 
         return collect(array_slice($sheet, $dataStartIndex))
-            ->filter(fn (array $row) => collect($row)->filter(fn ($value) => $value !== null && $value !== '')->isNotEmpty())
+            ->filter(fn(array $row) => collect($row)->filter(fn($value) => $value !== null && $value !== '')->isNotEmpty())
             ->map(function (array $row) use ($headings) {
                 $normalized = [];
 
@@ -503,7 +565,7 @@ class DataExchangeController extends Controller
         $nextRow = $sheet[$headerIndex + 1] ?? [];
 
         $plainHeadings = array_map(
-            fn ($heading) => $this->normalizeHeading((string) $heading, $config),
+            fn($heading) => $this->normalizeHeading((string) $heading, $config),
             $headerRow
         );
 
@@ -527,12 +589,12 @@ class DataExchangeController extends Controller
         }
 
         $plainMatches = collect($plainHeadings)
-            ->filter(fn ($heading) => in_array($heading, $config['columns'], true))
+            ->filter(fn($heading) => in_array($heading, $config['columns'], true))
             ->unique()
             ->count();
 
         $combinedMatches = collect($combinedHeadings)
-            ->filter(fn ($heading) => in_array($heading, $config['columns'], true))
+            ->filter(fn($heading) => in_array($heading, $config['columns'], true))
             ->unique()
             ->count();
 
@@ -547,8 +609,8 @@ class DataExchangeController extends Controller
     {
         foreach ($sheet as $index => $row) {
             $matchedColumns = collect($row)
-                ->map(fn ($heading) => $this->normalizeHeading((string) $heading, $config))
-                ->filter(fn ($heading) => in_array($heading, $config['columns'], true))
+                ->map(fn($heading) => $this->normalizeHeading((string) $heading, $config))
+                ->filter(fn($heading) => in_array($heading, $config['columns'], true))
                 ->unique()
                 ->count();
 
@@ -685,7 +747,7 @@ class DataExchangeController extends Controller
         $allowedColumns = $config['columns'];
         $data = collect($row)
             ->only($allowedColumns)
-            ->map(fn ($value, $column) => $this->normalizeCellValue($column, $value))
+            ->map(fn($value, $column) => $this->normalizeCellValue($column, $value))
             ->all();
 
         foreach (($config['defaults'] ?? []) as $column => $value) {
@@ -858,9 +920,9 @@ class DataExchangeController extends Controller
 
         while (
             User::query()
-                ->where('username', $username)
-                ->when($ignoreUserId, fn ($query) => $query->whereKeyNot($ignoreUserId))
-                ->exists()
+            ->where('username', $username)
+            ->when($ignoreUserId, fn($query) => $query->whereKeyNot($ignoreUserId))
+            ->exists()
         ) {
             $username = $base . $counter;
             $counter++;

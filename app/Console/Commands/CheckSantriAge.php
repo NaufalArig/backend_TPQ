@@ -4,60 +4,117 @@ namespace App\Console\Commands;
 
 use App\Models\Notification;
 use App\Models\Santri;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class CheckSantriAge extends Command
 {
     protected $signature = 'check:santri-age';
-    protected $description = 'Cek santri yang akan atau sudah mencapai usia 3 tahun';
+
+    protected $description = 'Cek santri yang sudah berusia 3 tahun tetapi belum aktif';
 
     public function handle()
     {
-        $today = now()->toDateString();
-        $nextWeek = now()->addDays(7)->toDateString();
+        $today = Carbon::today();
 
-        $santris = Santri::where('age_notification_sent', false)
+        // Ambil semua santri yang:
+        // 1. Memiliki TPQ
+        // 2. Memiliki tanggal lahir
+        // 3. Statusnya belum aktif
+        $santris = Santri::query()
             ->whereNotNull('tpq_id')
-            ->whereNotNull('join_date')
-            ->whereDate('join_date', '<=', $nextWeek)
+            ->whereNotNull('birth_date')
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'aktif');
+            })
             ->get();
 
         if ($santris->isEmpty()) {
-            $this->info('Tidak ada santri yang perlu dibuatkan notifikasi.');
+            $this->info('Tidak ada santri yang perlu diperiksa.');
+
             return Command::SUCCESS;
         }
 
-        foreach ($santris as $santri) {
-            $joinDate = \Carbon\Carbon::parse($santri->join_date);
-            $daysLeft = now()->startOfDay()->diffInDays($joinDate->copy()->startOfDay(), false);
+        $totalCreated = 0;
+        $totalUpdated = 0;
 
-            if ($daysLeft > 0) {
-                $title = 'Santri Akan Siap Masuk TPQ';
-                $message = $santri->name . ' akan mencapai usia 3 tahun pada ' .
-                    $joinDate->format('d-m-Y') . ' atau sekitar ' . $daysLeft . ' hari lagi.';
-            } else {
-                $title = 'Santri Siap Masuk TPQ';
-                $message = $santri->name . ' sudah mencapai usia 3 tahun dan siap masuk TPQ.';
+        foreach ($santris as $santri) {
+
+            $birthDate = Carbon::parse($santri->birth_date);
+
+            // Tanggal ketika santri tepat berusia 3 tahun
+            $threeYearsDate = $birthDate->copy()->addYears(3);
+
+            // Jika umur santri belum mencapai 3 tahun,
+            // lanjut ke santri berikutnya
+            if ($today->lt($threeYearsDate)) {
+                continue;
             }
 
-            Notification::create([
-                'tpq_id' => $santri->tpq_id,
-                'student_id' => $santri->id,
-                'user_id' => null,
-                'title' => $title,
-                'message' => $message,
-                'type' => 'student_age',
-                'is_read' => false,
-            ]);
+            // Hitung berapa hari yang sudah lewat
+            // sejak santri tepat berusia 3 tahun
+            $daysOver = $threeYearsDate->diffInDays($today);
 
-            $santri->update([
-                'age_notification_sent' => true,
-            ]);
+            $title = 'Santri Belum Diaktifkan';
 
-            $this->info('Notifikasi dibuat untuk: ' . $santri->name);
+            if ($daysOver === 0) {
+                $message = "{$santri->name} telah mencapai usia 3 tahun "
+                    . "dan statusnya masih belum aktif. "
+                    . "Silakan periksa dan aktifkan data santri.";
+            } else {
+                $message = "{$santri->name} telah berusia 3 tahun "
+                    . "{$daysOver} hari dan statusnya masih belum aktif. "
+                    . "Silakan periksa dan aktifkan data santri.";
+            }
+
+            // Cari notifikasi student_age milik santri tersebut
+            $notification = Notification::query()
+                ->where('tpq_id', $santri->tpq_id)
+                ->where('student_id', $santri->id)
+                ->where('type', 'student_age')
+                ->first();
+
+            if ($notification) {
+
+                // Update notifikasi yang sudah ada
+                $notification->update([
+                    'title' => $title,
+                    'message' => $message,
+                    'is_read' => false,
+                ]);
+
+                $totalUpdated++;
+
+                $this->info(
+                    "Notifikasi diperbarui: {$santri->name} "
+                    . "(3 tahun {$daysOver} hari)"
+                );
+
+            } else {
+
+                // Buat notifikasi baru
+                Notification::create([
+                    'tpq_id' => $santri->tpq_id,
+                    'student_id' => $santri->id,
+                    'user_id' => null,
+                    'title' => $title,
+                    'message' => $message,
+                    'type' => 'student_age',
+                    'is_read' => false,
+                ]);
+
+                $totalCreated++;
+
+                $this->info(
+                    "Notifikasi dibuat: {$santri->name} "
+                    . "(3 tahun {$daysOver} hari)"
+                );
+            }
         }
 
-        $this->info('Total notifikasi dibuat: ' . $santris->count());
+        $this->info("Total notifikasi baru: {$totalCreated}");
+        $this->info("Total notifikasi diperbarui: {$totalUpdated}");
 
         return Command::SUCCESS;
     }

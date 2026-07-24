@@ -53,7 +53,7 @@ class SantriController extends Controller
             'student_number' => 'nullable|string|max:255',
             'tpq_number' => 'nullable|string|max:255',
 
-            'name' => 'required|string|max:255',
+            'name'               => ['required', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
 
             'nisn' => [
                 'nullable',
@@ -62,20 +62,20 @@ class SantriController extends Controller
                 Rule::unique('students', 'nisn'),
             ],
 
-            'nik' => 'nullable|string|max:255',
-            'family_card_number' => 'nullable|string|max:255',
+            'nik'                => ['nullable', 'digits:16'],
+            'family_card_number' => ['nullable', 'digits:16'],
 
             'gender' => 'required|in:male,female',
 
-            'birth_place' => 'nullable|string|max:255',
+            'birth_place'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.,'-]+$/u"],
             'birth_date' => 'required|date',
 
             'child_order' => 'nullable|integer|min:1',
             'siblings_count' => 'nullable|integer|min:0',
 
-            'father_name' => 'nullable|string|max:255',
-            'mother_name' => 'nullable|string|max:255',
-            'contact_guardian' => 'nullable|string|max:20',
+            'father_name'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
+            'mother_name'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
+            'contact_guardian'   => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s]+$/'],
 
             'hamlet' => 'nullable|string|max:255',
             'village' => 'nullable|string|max:255',
@@ -162,7 +162,7 @@ class SantriController extends Controller
             'student_number' => 'nullable|string|max:255',
             'tpq_number' => 'nullable|string|max:255',
 
-            'name' => 'required|string|max:255',
+            'name'               => ['required', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
 
             'nisn' => [
                 'nullable',
@@ -171,20 +171,20 @@ class SantriController extends Controller
                 Rule::unique('students', 'nisn')->ignore($student->id),
             ],
 
-            'nik' => 'nullable|string|max:255',
-            'family_card_number' => 'nullable|string|max:255',
+            'nik'                => ['nullable', 'digits:16'],
+            'family_card_number' => ['nullable', 'digits:16'],
 
             'gender' => 'required|in:male,female',
 
-            'birth_place' => 'nullable|string|max:255',
+            'birth_place'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.,'-]+$/u"],
             'birth_date' => 'required|date',
 
             'child_order' => 'nullable|integer|min:1',
             'siblings_count' => 'nullable|integer|min:0',
 
-            'father_name' => 'nullable|string|max:255',
-            'mother_name' => 'nullable|string|max:255',
-            'contact_guardian' => 'nullable|string|max:20',
+            'father_name'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
+            'mother_name'        => ['nullable', 'string', 'max:255', "regex:/^[\p{L}\s.'-]+$/u"],
+            'contact_guardian'   => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s]+$/'],
 
             'hamlet' => 'nullable|string|max:255',
             'village' => 'nullable|string|max:255',
@@ -255,7 +255,7 @@ class SantriController extends Controller
         if ($student->birth_date !== $validated['birth_date']) {
             $validated['age_notification_sent'] = false;
         }
-        
+
         $student->update($validated);
 
         $this->createAgeNotificationIfNeeded($student->fresh());
@@ -474,6 +474,38 @@ class SantriController extends Controller
             'message' => $message,
             'type' => $type,
             'is_read' => false,
+        ]);
+    }
+
+    public function graduate(string $id)
+    {
+        $student = $this->findStudentByTpqAndRole($id);
+
+        if ($student->status !== 'active') {
+            return response()->json([
+                'message' => 'Hanya santri berstatus aktif yang dapat diluluskan (naik tingkat).',
+            ], 422);
+        }
+
+        $oldValues = $student->toArray();
+
+        $student->update([
+            'status'         => 'active',
+            'study_class_id' => null,
+        ]);
+
+        ActivityLogService::log(
+            action: 'update',
+            module: 'students',
+            entity: $student,
+            oldValues: $oldValues,
+            newValues: $student->fresh()->toArray(),
+            description: 'Naik tingkat (lepas kelas): ' . $student->name
+        );
+
+        return response()->json([
+            'message' => 'Santri berhasil diluluskan (naik tingkat) & siap dimasukkan ke kelas berikutnya.',
+            'data'    => $student->fresh('studyClass'),
         ]);
     }
 }

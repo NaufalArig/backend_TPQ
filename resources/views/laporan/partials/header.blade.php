@@ -119,15 +119,8 @@
         }
 
         .qiraati-logo {
-            width: 150px;
-            height: 150px;
-            object-fit: contain;
-            display: inline-block;
-        }
-
-        .logo-tpq {
-            width: 150px;
-            height: 150px;
+            width: 88px;
+            height: 88px;
             object-fit: contain;
             display: inline-block;
         }
@@ -374,18 +367,20 @@
                 <table class="letterhead-top-table">
                     <tr>
                         <td class="logo-cell">
-                            <img src="{{ public_path($letterhead['logo'] ?? 'images/qiraati-logo-putih.png') }}" class="qiraati-logo" alt="Logo Qiraati">
+                            <img src="{{ public_path($letterhead['logo'] ?? 'images/qiraati-logo-putih.png') }}"
+                                class="qiraati-logo" alt="Logo Qiraati">
                         </td>
                         <td class="org-text">
                             <div class="arabic-line">
-                                <img src="{{ public_path($letterhead['kaligrafi'] ?? 'images/kaligrafi-putih-transparan.png') }}" alt="Kaligrafi">
+                                <img src="{{ public_path($letterhead['kaligrafi'] ?? 'images/kaligrafi-putih-transparan.png') }}"
+                                    alt="Kaligrafi">
                             </div>
                             <div class="org-label">KOORDINATOR PENDIDIKAN AL-QUR'AN</div>
                             <div class="method-name">METODE QIRA'ATI</div>
                             <div class="branch">CABANG BATAM - KEPRI</div>
                         </td>
                         <td class="logo-cell">
-                            <img src="{{ public_path($letterhead['logo-tpq'] ?? 'images/logo-01.png') }}" class="logo-tpq" alt="Logo TPQ">
+                            <div class="logo-box">TPQ</div>
                         </td>
                     </tr>
                 </table>
@@ -396,192 +391,12 @@
                 <div class="school-name">{{ $letterhead['school_name'] ?? "BARAKATUL QUR'AN" }}</div>
                 <div class="school-number">NOMOR INDUK : {{ $letterhead['school_number'] ?? '06.02.03.001' }}</div>
                 <div class="school-address">
-                    @foreach (($letterhead['address_lines'] ?? []) as $line)
-                        {{ $line }}@if (!$loop->last)<br>@endif
+                    @foreach ($letterhead['address_lines'] ?? [] as $line)
+                        {{ $line }}@if (!$loop->last)
+                            <br>
+                        @endif
                     @endforeach
                 </div>
             </div>
         </div>
     @endif
-
-    <div class="report-title">{{ $reportTitle ?? 'Laporan Keuangan' }}</div>
-    <div class="report-date">
-        Periode:
-        {{ $dateFrom ? \Carbon\Carbon::parse($dateFrom)->format('d-m-Y') : 'Awal' }}
-        s/d
-        {{ $dateTo ? \Carbon\Carbon::parse($dateTo)->format('d-m-Y') : 'Akhir' }}
-        @if (!empty($search))
-            | Pencarian: {{ $search }}
-        @endif
-        @if (!empty($transactionType))
-            | Jenis:
-            {{ $transactionType === 'expense' ? 'Pengeluaran' : 'Pemasukan' }}
-        @endif
-        | Tanggal Cetak: {{ date('d-m-Y') }}
-    </div>
-    <hr class="divider">
-
-    <table class="main-table">
-        <thead>
-            <tr>
-                <th style="width:4%">No</th>
-                <th style="width:12%">Tanggal</th>
-                <th style="width:13%">Jenis</th>
-                <th style="width:16%">Nama/Santri</th>
-                <th style="width:15%">Kategori</th>
-                <th style="width:14%">Nominal</th>
-                <th style="width:16%">Keterangan</th>
-                <th style="width:10%">Petugas</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if ($data->isEmpty())
-                <tr class="empty-row">
-                    <td colspan="8">Tidak ada data keuangan</td>
-                </tr>
-            @else
-                @foreach ($data as $i => $item)
-                    <tr>
-                        <td class="td-center">{{ $i + 1 }}</td>
-
-                        <td class="td-center">
-                            {{ $item['payment_date'] ? \Carbon\Carbon::parse($item['payment_date'])->format('d-m-Y') : '-' }}
-                        </td>
-
-                        <td class="td-center">
-                            @if ($item['type'] === 'SPP')
-                                <span class="badge-spp">SPP</span>
-                            @elseif (($item['transaction_type'] ?? 'income') === 'expense')
-                                <span class="badge-expense">Pembangunan - Pengeluaran</span>
-                            @else
-                                <span class="badge-income">Pembangunan - Pemasukan</span>
-                            @endif
-                        </td>
-
-                        <td>
-                            {{ $item['name'] ?? '-' }}
-                        </td>
-
-                        <td>
-                            @if ($item['type'] === 'SPP')
-                                SPP {{ $item['month'] }}/{{ $item['year'] }}
-                            @else
-                                {{ $item['category'] ?? '-' }}
-                            @endif
-                        </td>
-
-                        <td class="td-right">
-                            @if (($item['transaction_type'] ?? 'income') === 'expense')
-                                <span class="val-expense">- Rp {{ number_format($item['amount'], 0, ',', '.') }}</span>
-                            @else
-                                Rp {{ number_format($item['amount'], 0, ',', '.') }}
-                            @endif
-                        </td>
-
-                        <td>
-                            {{ $item['note'] ?? '-' }}
-                        </td>
-
-                        <td class="td-center">
-                            {{ $item['user'] ?? '-' }}
-                        </td>
-                    </tr>
-                @endforeach
-            @endif
-        </tbody>
-    </table>
-
-    @if ($type === 'spp' && !empty($sppSummary))
-        <div class="summary-section" style="width:60%;">
-            <table class="summary-table">
-                <thead>
-                    <tr>
-                        <th colspan="2">RINGKASAN LAPORAN SPP</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Tahun</td>
-                        <td class="td-right">{{ $sppSummary['year'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Bulan</td>
-                        <td class="td-right">{{ $sppSummary['month_label'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Tanggal Cetak</td>
-                        <td class="td-right">{{ $sppSummary['print_date'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Jumlah Santri</td>
-                        <td class="td-right">{{ $sppSummary['total_santri'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Sudah Membayar</td>
-                        <td class="val-total">{{ $sppSummary['sudah_membayar'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Belum Membayar</td>
-                        <td class="val-expense">{{ $sppSummary['belum_membayar'] }}</td>
-                    </tr>
-                    <tr class="saldo-row">
-                        <td>Total Pemasukan</td>
-                        <td class="val-total">
-                            Rp {{ number_format($sppSummary['total_pemasukan'], 0, ',', '.') }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    @else
-        <div class="summary-section">
-            <table class="summary-table">
-                <thead>
-                    <tr>
-                        <th colspan="2">RINGKASAN KEUANGAN</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Total SPP</td>
-                        <td class="val-total">
-                            Rp {{ number_format($totalSpp, 0, ',', '.') }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Pemasukan Pembangunan</td>
-                        <td class="val-total">
-                            Rp {{ number_format($totalPembangunanPemasukan ?? $totalPembangunan, 0, ',', '.') }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Pengeluaran Pembangunan</td>
-                        <td class="val-expense">
-                            - Rp {{ number_format($totalPembangunanPengeluaran ?? 0, 0, ',', '.') }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Saldo Pembangunan</td>
-                        <td class="val-total">
-                            Rp {{ number_format($totalPembangunan, 0, ',', '.') }}
-                        </td>
-                    </tr>
-                    <tr class="saldo-row">
-                        <td>Total Saldo</td>
-                        <td class="val-total">
-                            Rp {{ number_format($totalPemasukan, 0, ',', '.') }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    @endif
-
-    <div class="footer-line">
-        <div class="footer-text">
-            Dokumen ini dicetak secara otomatis oleh sistem TPQ | {{ date('d-m-Y') }}
-        </div>
-    </div>
-</body>
-
-</html>

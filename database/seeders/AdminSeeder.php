@@ -15,7 +15,9 @@ class AdminSeeder extends Seeder
             [
                 'name' => 'Administrator',
                 'email' => 'admin@tpq.test',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make(
+                    env('DEFAULT_ADMIN_PASSWORD', 'ChangeMe123!')
+                ),
                 'role' => 'admin',
                 'status' => 'active',
             ]
