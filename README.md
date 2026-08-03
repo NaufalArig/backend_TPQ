@@ -1,66 +1,304 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# TPQ Administration System - Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Backend untuk sistem administrasi Taman Pendidikan Al-Qur'an (TPQ) yang dibangun menggunakan Laravel.
 
-## About Laravel
+Backend berfungsi sebagai REST API yang menangani proses autentikasi, pengolahan data, validasi, business logic, dan komunikasi dengan database MySQL.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Frontend aplikasi dikembangkan menggunakan Next.js dan berkomunikasi dengan backend melalui API.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* Laravel
+* PHP
+* MySQL
+* Laravel Sanctum
+* Eloquent ORM
+* REST API
 
-## Learning Laravel
+## Features
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+* Authentication
+* Role dan hak akses pengguna
+* Manajemen santri
+* Manajemen guru
+* Manajemen kelas
+* Absensi santri
+* Keuangan SPP
+* Manajemen aset
+* Notifikasi
+* Dashboard
+* Laporan
+* Validasi data
+* Protected API
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Project Structure
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Struktur utama backend:
 
-## Laravel Sponsors
+```text
+tpq-backend/
+├── app/
+│   ├── Http/
+│   │   └── Controllers/
+│   └── Models/
+├── database/
+│   ├── migrations/
+│   └── seeders/
+├── routes/
+│   └── api.php
+├── config/
+├── resources/
+├── storage/
+├── .env
+├── composer.json
+└── ...
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+`app/Http/Controllers/` berisi controller yang menangani request dari client.
 
-### Premium Partners
+`app/Models/` berisi model yang digunakan untuk berinteraksi dengan database.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+`database/migrations/` digunakan untuk mengatur struktur database.
 
-## Contributing
+`database/seeders/` digunakan untuk menyediakan data awal apabila diperlukan.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+`routes/api.php` berisi route API yang digunakan oleh frontend.
 
-## Code of Conduct
+## Requirements
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+* PHP
+* Composer
+* MySQL
+* Git
 
-## Security Vulnerabilities
+Versi PHP dan Laravel mengikuti versi yang digunakan pada project.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Installation
 
-## License
+Clone repository:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+git clone https://github.com/USERNAME/tpq-backend.git
+cd tpq-backend
+```
+
+Install dependency:
+
+```bash
+composer install
+```
+
+Buat file environment:
+
+```bash
+copy .env.example .env
+```
+
+Linux/macOS:
+
+```bash
+cp .env.example .env
+```
+
+Generate application key:
+
+```bash
+php artisan key:generate
+```
+
+## Database
+
+Buat database MySQL, kemudian sesuaikan konfigurasi pada `.env`.
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=tpq_database
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+Jalankan migration:
+
+```bash
+php artisan migrate
+```
+
+Jika project menggunakan seeder:
+
+```bash
+php artisan db:seed
+```
+
+atau:
+
+```bash
+php artisan migrate --seed
+```
+
+## Running the Application
+
+Jalankan server Laravel:
+
+```bash
+php artisan serve
+```
+
+Backend akan tersedia pada:
+
+```text
+http://127.0.0.1:8000
+```
+
+API:
+
+```text
+http://127.0.0.1:8000/api
+```
+
+## Authentication
+
+Authentication menggunakan Laravel Sanctum.
+
+Endpoint yang membutuhkan autentikasi dilindungi menggunakan middleware:
+
+```php
+auth:sanctum
+```
+
+Dengan mekanisme tersebut, request ke endpoint tertentu harus berasal dari pengguna yang sudah terautentikasi.
+
+## API
+
+API digunakan oleh frontend Next.js untuk mengambil dan mengelola data.
+
+Beberapa kelompok data yang tersedia meliputi:
+
+* Authentication
+* Santri
+* Guru
+* Kelas
+* Absensi
+* Keuangan SPP
+* Aset
+* Notifikasi
+* Laporan
+
+Daftar route API dapat dilihat pada:
+
+```text
+routes/api.php
+```
+
+Untuk melihat seluruh route Laravel:
+
+```bash
+php artisan route:list
+```
+
+## CORS
+
+Karena frontend dan backend berjalan sebagai aplikasi yang terpisah, backend menggunakan konfigurasi CORS untuk mengatur request dari frontend.
+
+Contoh saat development:
+
+```text
+Frontend
+http://localhost:3000
+
+        ↓
+
+Backend
+http://127.0.0.1:8000
+```
+
+Konfigurasi CORS disesuaikan dengan origin frontend yang digunakan.
+
+## Database
+
+Database menggunakan MySQL dan dikelola melalui Laravel Eloquent dan migration.
+
+Struktur database berada pada:
+
+```text
+database/migrations/
+```
+
+Data awal dapat ditambahkan melalui:
+
+```text
+database/seeders/
+```
+
+## Security
+
+Beberapa bagian keamanan yang diterapkan pada backend:
+
+* Authentication menggunakan Laravel Sanctum
+* Pembatasan akses menggunakan middleware
+* Validasi data sebelum diproses
+* Eloquent ORM untuk interaksi database
+* Konfigurasi CORS
+* Environment variable untuk konfigurasi yang bersifat sensitif
+
+File `.env` tidak disertakan dalam repository dan tidak boleh digunakan untuk menyimpan credential pada repository publik.
+
+## Useful Commands
+
+Clear cache:
+
+```bash
+php artisan optimize:clear
+```
+
+Melihat route:
+
+```bash
+php artisan route:list
+```
+
+Migration:
+
+```bash
+php artisan migrate
+```
+
+Migration dan seeder:
+
+```bash
+php artisan migrate --seed
+```
+
+Menjalankan server:
+
+```bash
+php artisan serve
+```
+
+## Frontend
+
+Frontend aplikasi dikembangkan menggunakan Next.js.
+
+Repository frontend:
+
+```text
+tpq-frontend
+```
+
+Alur komunikasi aplikasi:
+
+```text
+Next.js
+   │
+   │ REST API
+   ▼
+Laravel
+   │
+   ▼
+MySQL
+```
+
+## Author
+
+Wong Sepele
